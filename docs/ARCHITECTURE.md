@@ -1,113 +1,156 @@
-# VoltYield — Architecture
+# PartnerOS — Architecture
 
-## Overview
+UX architecture, user flows, data model, API and AI assistant logic.
+
+---
+
+## 1. UX architecture
 
 ```
-                    ┌──────────────────────────────────────────────┐
-                    │                Next.js (App Router)          │
-                    │                                              │
-  Browser ───────►  │  Server Components (pages)  ──┐               │
-                    │                               ├─► src/lib/data.ts  ◄── single data-access seam
-  fetch() ───────►  │  Route handlers (/api/*)  ────┘        │       │
-                    │                                        │       │
-                    │  Client Components (charts, cards,      │       │
-                    │   map, recommendation/alert actions)    │       │
-                    └────────────────────────────────────────┼───────┘
-                                                              │
-                          ┌───────────────────────────────────┴───────────────┐
-                          │                                                   │
-                  MVP (DATA_SOURCE=mock)                          LIVE (future, DATA_SOURCE=live)
-                  ─────────────────────                          ─────────────────────────────
-                  src/lib/mock-data.ts          ──►  PrismaClient → PostgreSQL
-                  src/lib/recommendation-engine.ts   external providers:
-                  src/lib/demand-signals.ts            • OpenChargeMap (competitor stations)
-                  (in-memory state for demo)            • Google Maps Places (discovery/geocoding)
-                                                       • Chargeprice (tariffs)
-                                                       • roaming/CPO APIs (availability, push)
-                                                       • OpenWeather (weather)
-                                                       • CSV import / manual
-                                                     background jobs (price polling, signal refresh)
-                                                     optional LLM (Anthropic) → rationale rewrite only
+┌──────────────────────────────────────────────────────────────────┐
+│  Sidebar (sticky)                Topbar (sticky: search · alerts · me) │
+│  ── Overview                                                       │
+│     Dashboard · Alerts Center                                      │
+│  ── Network                                                        │
+│     Partners · Sites · Incidents · Deployments                     │
+│  ── Business                                                       │
+│     Revenue & Royalties · Campaigns · Reports · Documents          │
+│  ── Settings                                                       │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-## Layers
+Page anatomy (consistent across the app):
+- **PageHeader** — title, one-line subtitle, optional breadcrumb, primary action.
+- **KPI tiles row** — 4 large rounded cards with value + MoM delta + sub-line.
+- **Two-column body** — main content (2/3) + side rail (1/3) with the AI summary
+  card, related lists and detail panels.
+- **Cards** — white, `rounded-2xl`, soft shadow; header with icon + title + subtitle.
+- **Status as colour** — green = healthy/active/paid, blue = in progress/issued,
+  amber = needs attention/maintenance/scheduled, red = critical/faulted, violet
+  = scheduled milestone.
 
-### 1. Presentation — `src/app/**`, `src/components/**`
-- **Server Components** render pages and call `src/lib/data.ts` directly (async).
-- **Client Components** (`"use client"`): `charts.tsx` (Recharts), `SiteMap.tsx`
-  (dependency-free schematic map), `RecommendationCard.tsx`, `AlertsPanel.tsx`,
-  `Sidebar.tsx`, `ReportActions.tsx`. They mutate state via the `/api/*` routes
-  and call `router.refresh()` to re-pull server data.
-- Styling: Tailwind with a custom theme (`tailwind.config.ts`) — brand
-  `#0B1F4D`, secondary `#1E4ED8`, canvas `#F8FAFC`, ink `#111827`, muted
-  `#6B7280`, success/warning/danger.
+Key UX principles: white background, large rounded cards, elegant spacing, very
+clear hierarchy, AI summary near the top of every entity page, "explain it
+visually" for anything financial.
 
-### 2. API — `src/app/api/**`
-Thin REST handlers over the data layer. `dynamic = "force-dynamic"` so the demo
-reflects in-memory state changes. Mutations: `PATCH /api/recommendations/:id`
-(status), `PATCH /api/alerts/:id` (read), `POST /api/alerts` (read all).
+## 2. User flows
 
-### 3. Data access — `src/lib/data.ts`  ← **the seam**
-The only module pages/routes import for data. In the MVP it:
-- imports the static mock dataset (`mock-data.ts`),
-- runs the engine (`recommendation-engine.ts`) to derive benchmarks,
-  recommendations, alerts, KPIs, and reports (memoized),
-- keeps interactive demo state (recommendation status overrides, alert
-  read-state) in module memory.
+**Operator — Monday morning triage**
+Dashboard → see "Sites needing attention" + Alerts → open a critical incident →
+read AI incident summary + timeline → "Update partner" (drafted email) → done.
 
-To go live: re-implement each exported function with Prisma queries / provider
-calls. **Signatures and return types are the contract** — nothing upstream
-changes.
+**Operator — monthly close**
+Revenues → review royalty statements + discrepancy alerts → open the flagged
+partner → AI report summary explains the dip + service credit → Reports →
+generate & send the monthly partner report.
 
-### 4. Domain logic — `src/lib/recommendation-engine.ts`
-Pure functions, no I/O:
-- `buildBenchmark(site, competitors)` → `BenchmarkRow`
-- `generateRecommendations({site, competitors, utilization, demand, settings})` → `Recommendation[]`
-- `generateAlerts({...})` → `Alert[]`
-- `summarizeKpis({...})` → `KpiSummary`
-- `buildReport({...})` → `Report`
-- `explainRecommendation(rec)` → `string` (LLM seam; returns deterministic text in MVP)
+**Operator — new site**
+Deployments → open the delayed Decathlon Blagnac project → milestone timeline
+shows the Enedis grid-connection slippage + re-baselined go-live → AI deployment
+summary suggests "send the partner a re-baselined timeline with the reason" →
+update partner.
 
-All figures are deterministic. Impact uses a two-regime constant-elasticity
-proxy (own-price ≈ −0.4 when at/under market; competitive ≈ −1.3 when overpriced
-and under-utilized).
+**Partner (portal view, same pages scoped by `partnerId`)**
+Dashboard → revenue, sessions, uptime for *their* sites + AI site summary →
+Sites → drill into one site → see uptime trend, competitor benchmark,
+maintenance history → Revenues → the visual royalty explainer → Documents →
+download the latest contract & report.
 
-### 5. Demand signals — `src/lib/demand-signals.ts`
-`getDemandSignals(site)` returns mock signals in MVP; a commented `live` branch
-shows where weather/holiday/event/traffic providers plug in. `composeDemandMultiplier`
-combines raw signals into a multiplier (~1.0 neutral) the engine consumes.
+## 3. Application architecture
 
-### 6. Persistence — `prisma/schema.prisma` (+ `prisma/seed.ts`)
-Target Postgres model: `Organization`, `User`, `Site`, `Charger`, `Competitor`,
-`PriceObservation`, `UtilizationData`, `Recommendation`, `Alert`, `Report`. Not
-required for the MVP. `seed.ts` mirrors the mock dataset into the DB.
+- **Next.js 14 App Router.** Pages are React Server Components that call the
+  data layer directly (no client data-fetching needed for the demo). The only
+  Client Components are the chart wrappers (`src/components/Charts.tsx`, Recharts)
+  and the sidebar (active-link highlighting) — they receive only serialisable
+  props.
+- **Single data seam: `src/lib/data.ts`.** Every page and API route imports
+  from here. In the MVP it reads the in-memory dataset (`src/lib/mock-data.ts`)
+  and *derives* KPIs, network aggregates, alerts and AI summaries. To go live,
+  replace each function body with a Prisma query — signatures and return shapes
+  stay the same.
+- **REST API: `src/app/api/*`.** Thin route handlers over the data layer:
+  - `GET /api/me`
+  - `GET /api/dashboard`
+  - `GET /api/partners`, `GET /api/partners/[id]`
+  - `GET /api/sites?partnerId=&status=`, `GET /api/sites/[id]`, `GET /api/sites/[id]/summary`
+  - `GET /api/incidents?siteId=&partnerId=&status=&openOnly=`, `GET /api/incidents/[id]`
+  - `GET /api/deployments?partnerId=`, `GET /api/deployments/[id]`
+  - `GET /api/revenues?partnerId=&summary=true`
+  - `GET /api/campaigns?partnerId=`
+  - `GET /api/documents?partnerId=&siteId=&kind=`
+  - `GET /api/alerts?unreadOnly=&partnerId=&severity=`
+  Responses are `{ "data": ... }` or `{ "error": ... }`. Write endpoints
+  (create incident, issue statement, launch campaign, upload document) follow
+  the same pattern once a database is wired in.
+- **Auth (production):** session cookie → `User` with `organizationId` and, for
+  partners, `partnerId`. The data layer filters everything by org and (for
+  partner sessions) by partner. The MVP hard-codes `CURRENT_USER_ID`.
 
-## Data flow examples
+## 4. Data model
 
-**Dashboard load:** `DashboardPage` (server) → `getKpis()`, `getSites()`,
-`getBenchmarks()`, `getRecommendations({status:"open"})`, `getAlerts()` →
-`data.ts` `compute()` runs the engine once (memoized) → render KPI cards, map,
-benchmark table, top recommendation card, alerts panel.
+Domain types in `src/lib/types.ts` mirror the Prisma schema in
+`prisma/schema.prisma`:
 
-**Accept a recommendation:** `RecommendationCard` (client) → `PATCH
-/api/recommendations/:id {status:"accepted"}` → `setRecommendationStatus()`
-records an override → `router.refresh()` → server re-renders with the new status
-and updated KPIs (open-action count, revenue opportunity).
+```
+Organization 1───* User
+Organization 1───* Partner ──┐
+Partner      1───* Site      │  (Partner.accountManager → User)
+Site         1───* Charger
+Site         1───* SiteMonthlyMetric   (month, sessions, energyKwh, revenueEur, uptimePct, avgPriceEurKwh)
+Site         1───1 SiteBenchmark 1───* CompetitorPoint
+Site         1───* Incident 1───* IncidentEvent     (Incident.maintenanceProvider → MaintenanceProvider)
+Partner      1───* RevenueReport 1───* RoyaltyLine  (RevenueReport *──* Site via RevenueReportSite)
+Partner      1───* Deployment 1───* DeploymentMilestone   (Deployment 1───1 Site)
+Partner      1───* Campaign *──* Site (CampaignSite)
+Partner      1───* Contract           (links a DocumentItem)
+Org/Partner/Site/Deployment 1───* DocumentItem
+Organization 1───* Notification       (optionally → Partner, Site)
+Organization 1───* AiSummary          (scope + refId → site|partner|incident|monthly_report|deployment)
+```
 
-**Site detail:** `getSiteDetail(id)` bundles site, competitors, benchmark,
-utilization series, demand signals, price observations, and the site's
-recommendations/alerts in one call.
+Derived (not stored): network aggregates, partner metrics, trend deltas, the
+alert feed and the recent-activity feed are computed in `src/lib/data.ts`.
 
-## Conventions
+## 5. AI assistant logic (`src/lib/ai.ts`)
 
-- Types live in `src/lib/types.ts` and mirror the Prisma schema names.
-- Money is stored/handled in major currency units (e.g. EUR), formatted via
-  `src/lib/utils.ts` helpers.
-- IDs are stable strings in mock data (`site_1`, `cmp_3`, …); Prisma uses `cuid()`.
-- `DATA_SOURCE` env var selects mock vs. live behavior in the data/signal layers.
+**Contract:** the AI layer receives *already-computed* metrics and returns
+prose, bullet points, suggested actions and drafted emails. It never does
+arithmetic. Every AI output carries a model id and a "generated at" timestamp
+and is rendered in a clearly-labelled card with the note *"AI is used only for
+summaries, explanations and drafting. All figures are computed
+deterministically."*
 
-## Deployment
+Functions:
+- `summariseSite(site, benchmark, openIncidents)` — the dashboard/site summary
+  (sessions delta, uptime, competitor pricing position, open incidents) + next
+  steps.
+- `summarisePartner(partner, sites, openIncidents, lastContactDays, latestReport)`
+  — portfolio view, royalty status, inactivity flag.
+- `summariseIncident(incident, siteName, providerName)` — status, category,
+  ETA/SLA, vandalism note, next steps (e.g. "send a status update with the ETA").
+- `summariseReport(report, partner, sitesById)` — explains the royalty
+  build-up and any flagged discrepancy.
+- `summariseDeployment(deployment)` — progress, current/blocked milestone,
+  delay reason, re-baselined go-live.
+- `draftPartnerEmail(kind, ctx)` — `monthly_update | incident_update |
+  deployment_update | check_in` → `{ subject, body }`.
 
-Standard Next.js. `npm run build && npm run start`, or deploy to Vercel /
-container. No env vars are required for the MVP; set `DATABASE_URL` and provider
-keys when enabling live data. See `.env.example`.
+**Going live:** swap each template body for a single call to Claude/OpenAI with
+a system prompt like *"You write concise, plain-language updates for non-technical
+EV-charging partners. Use ONLY the figures provided. Never compute. Output a
+headline, 1–2 short paragraphs, 3–5 bullets and 1–3 next steps."* and pass the
+metrics object as the user message. Keep `AI_MODEL_ID` in sync so it shows on
+the card.
+
+## 6. Frontend conventions
+
+- Tailwind with a small set of component classes in `globals.css` (`.card`,
+  `.btn-*`, `.badge`, `.pill`, `.nav-link`, `.input`) and brand colours in
+  `tailwind.config.ts`.
+- One inline-SVG icon set (`src/components/Icons.tsx`) — no icon dependency.
+- Charts: thin Recharts wrappers (`AreaTrendChart`, `LineTrendChart`,
+  `BarSeriesChart`, `HBarCompareChart`, `Sparkline`) that take a serialisable
+  `format` key, not a formatter function (so they work as Client Components).
+- Status badges centralised in `src/components/StatusBadge.tsx`.
+- "Photos" are gradient placeholders (`PhotoPlaceholder`) until real imagery /
+  Mapbox tiles are connected.

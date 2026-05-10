@@ -1,97 +1,120 @@
-import { getCurrentUser, getOrganization, getUsers } from "@/lib/data";
-import { Card, CardHeader, PageHeader } from "@/components/ui";
-import { formatPercent, formatPrice } from "@/lib/utils";
+import { getCurrentUser, getDashboardMetrics, getMaintenanceProviders, getOrganization } from "@/lib/data";
+import { PageHeader, Card, CardHeader, KeyValue, Avatar, ActionButton, Badge } from "@/components/ui";
+import { BoltIcon, CogIcon, SparkleIcon, UsersIcon, WrenchIcon } from "@/components/Icons";
+import * as db from "@/lib/mock-data";
+import { titleCase } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
+export default function SettingsPage() {
+  const org = getOrganization();
+  const user = getCurrentUser();
+  const providers = getMaintenanceProviders();
+  const m = getDashboardMetrics();
 
-const INTEGRATIONS = [
-  { name: "OpenChargeMap", purpose: "Competitor station locations & metadata", env: "OPENCHARGEMAP_API_KEY", status: "Not connected" },
-  { name: "Google Maps Places", purpose: "Site/competitor discovery & geocoding", env: "GOOGLE_MAPS_API_KEY", status: "Not connected" },
-  { name: "Chargeprice", purpose: "Tariff & price-per-kWh data", env: "CHARGEPRICE_API_KEY", status: "Not connected" },
-  { name: "OpenWeather", purpose: "Weather demand signal", env: "OPENWEATHER_API_KEY", status: "Not connected" },
-  { name: "Anthropic (Claude)", purpose: "LLM rationale rewriting for recommendations", env: "ANTHROPIC_API_KEY", status: "Not connected" },
-  { name: "CSV import", purpose: "Manual upload of sites / competitors / prices", env: "—", status: "Available (manual)" },
-];
-
-export default async function SettingsPage() {
-  const [org, users, me] = await Promise.all([getOrganization(), getUsers(), getCurrentUser()]);
-  const dataSource = process.env.DATA_SOURCE ?? "mock";
-
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Settings" subtitle="Organization, pricing strategy, team and data sources" />
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Organization" />
-          <div className="card-pad grid grid-cols-2 gap-4 text-sm">
-            <Field label="Name" value={org.name} />
-            <Field label="Country" value={org.country} />
-            <Field label="Currency" value={org.currency} />
-            <Field label="Data source mode" value={<span className="badge bg-slate-100 text-slate-700">{dataSource}</span>} />
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader title="Pricing strategy" subtitle="Inputs to the recommendation engine" />
-          <div className="card-pad grid grid-cols-2 gap-4 text-sm">
-            <Field label="Target gap above local avg" value={formatPercent(org.settings.targetGapAbove)} />
-            <Field label="Low-utilization threshold" value={formatPercent(org.settings.lowUtilizationThreshold)} />
-            <Field label="High-utilization threshold" value={formatPercent(org.settings.highUtilizationThreshold)} />
-            <Field label="Minimum price step" value={formatPrice(org.settings.minPriceStep, org.currency, 2)} />
-            <Field label="Automated price pushes" value={<span className={"badge " + (org.settings.autoApply ? "bg-emerald-50 text-success" : "bg-slate-100 text-slate-600")}>{org.settings.autoApply ? "Enabled" : "Disabled (MVP)"}</span>} />
-          </div>
-          <div className="border-t border-slate-100 px-5 py-3 text-xs text-muted">
-            In the MVP these are read-only. Editing writes back to the organization record and changes engine output on the next refresh.
-          </div>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader title="Team" subtitle={`${users.length} members`} />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr><th className="px-5 py-3">Name</th><th className="px-5 py-3">Email</th><th className="px-5 py-3">Role</th></tr></thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="table-row">
-                  <td className="px-5 py-3 font-medium text-ink">{u.name}{u.id === me.id && <span className="ml-2 badge bg-blue-50 text-brand-600">you</span>}</td>
-                  <td className="px-5 py-3 text-muted">{u.email}</td>
-                  <td className="px-5 py-3 capitalize">{u.role}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader title="Data sources & integrations" subtitle="Configure API keys in .env to switch from mock to live data" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr><th className="px-5 py-3">Provider</th><th className="px-5 py-3">Purpose</th><th className="px-5 py-3">Env var</th><th className="px-5 py-3">Status</th></tr></thead>
-            <tbody>
-              {INTEGRATIONS.map((i) => (
-                <tr key={i.name} className="table-row">
-                  <td className="px-5 py-3 font-medium text-ink">{i.name}</td>
-                  <td className="px-5 py-3 text-muted">{i.purpose}</td>
-                  <td className="px-5 py-3 font-mono text-xs text-slate-500">{i.env}</td>
-                  <td className="px-5 py-3"><span className="badge bg-slate-100 text-slate-600">{i.status}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <div className="stat-label">{label}</div>
-      <div className="mt-1 text-sm font-medium text-ink">{value}</div>
+      <PageHeader title="Settings" subtitle="Workspace, team, royalty defaults, maintenance providers and AI assistant configuration." />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader title="Organization" subtitle="Your CPO workspace" icon={<CogIcon className="h-5 w-5" />} action={<ActionButton>Edit</ActionButton>} />
+            <div className="card-pad">
+              <dl>
+                <KeyValue label="Workspace name">{org.name}</KeyValue>
+                <KeyValue label="Legal entity">{org.legalName}</KeyValue>
+                <KeyValue label="Country">{org.country}</KeyValue>
+                <KeyValue label="Reporting currency">{org.currency}</KeyValue>
+                <KeyValue label="Partner contact email">{org.contactEmail}</KeyValue>
+                <KeyValue label="Network size">{m.totalSitesCount} sites · {m.totalChargersCount} chargers · {m.partnersCount} partners</KeyValue>
+              </dl>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Team" subtitle="Operator users with access to this workspace" icon={<UsersIcon className="h-5 w-5" />} action={<ActionButton>Invite</ActionButton>} />
+            <div className="divide-y divide-slate-100">
+              {db.users.map((u) => (
+                <div key={u.id} className="flex items-center gap-3 px-5 py-3.5 sm:px-6">
+                  <Avatar name={u.name} color={u.avatarColor} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink">{u.name} {u.id === user.id && <span className="text-xs text-muted">· you</span>}</p>
+                    <p className="text-[11px] text-muted">{u.email}</p>
+                  </div>
+                  <Badge tone={u.role === "operator_admin" ? "blue" : u.role === "partner" ? "neutral" : "green"}>{titleCase(u.role.replace("operator_", "operator "))}</Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Maintenance providers" subtitle="Contractors used for incident dispatch" icon={<WrenchIcon className="h-5 w-5" />} action={<ActionButton>Add provider</ActionButton>} />
+            <div className="divide-y divide-slate-100">
+              {providers.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink">{p.name}</p>
+                    <p className="text-[11px] text-muted">{p.regions.join(", ")} · {p.contactEmail} · {p.phone}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium tabular-nums text-ink">~{p.avgResolutionHours}h</p>
+                    <p className="text-[11px] text-muted">★ {p.rating.toFixed(1)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="card-pad">
+            <h2 className="section-title mb-3">Royalty & billing defaults</h2>
+            <dl>
+              <KeyValue label="Default royalty share">15%</KeyValue>
+              <KeyValue label="Platform & ops fee">5% of gross</KeyValue>
+              <KeyValue label="Electricity cost basis">~€0.16 / kWh wholesale</KeyValue>
+              <KeyValue label="Statement cadence">Monthly, issued by the 10th</KeyValue>
+              <KeyValue label="Payout terms">Net 30 from issue</KeyValue>
+            </dl>
+            <p className="mt-3 text-[11px] text-muted">Per-partner overrides are set on each partner’s contract.</p>
+          </Card>
+
+          <Card className="card-pad">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-white"><SparkleIcon className="h-4 w-4" /></span>
+              <h2 className="section-title">AI assistant</h2>
+            </div>
+            <dl>
+              <KeyValue label="Model">partneros-assistant-v1</KeyValue>
+              <KeyValue label="Used for">Summaries, explanations, recommendations, drafting</KeyValue>
+              <KeyValue label="Never used for">Royalty / financial calculations</KeyValue>
+              <KeyValue label="Auto-summaries">Sites, partners, incidents, reports, deployments</KeyValue>
+              <KeyValue label="Status"><Badge tone="green">Enabled</Badge></KeyValue>
+            </dl>
+            <p className="mt-3 text-[11px] text-muted">All metrics shown to partners are computed deterministically; the assistant only narrates and drafts. Swap the model for the Claude or OpenAI API in <code>src/lib/ai.ts</code>.</p>
+          </Card>
+
+          <Card className="card-pad">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><BoltIcon className="h-4 w-4" /></span>
+              <h2 className="section-title">Integrations</h2>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {[
+                ["OCPP / CSMS", "Connected", "green"],
+                ["Accounting (export)", "CSV / API", "neutral"],
+                ["Mapbox", "Configured", "green"],
+                ["Email (partner comms)", "Connected", "green"],
+                ["Claude API", "Bring your key", "amber"],
+              ].map(([name, status, tone]) => (
+                <li key={name as string} className="flex items-center justify-between">
+                  <span className="text-slate-700">{name}</span>
+                  <Badge tone={tone as never}>{status}</Badge>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

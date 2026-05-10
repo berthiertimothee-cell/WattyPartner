@@ -3,100 +3,100 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Wordmark } from "./Logo";
+import {
+  BellIcon,
+  BoltIcon,
+  ChartIcon,
+  CoinIcon,
+  CogIcon,
+  DocIcon,
+  GridIcon,
+  MegaphoneIcon,
+  PinIcon,
+  TruckIcon,
+  UsersIcon,
+  WrenchIcon,
+} from "../Icons";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: GridIcon },
-  { href: "/sites", label: "Sites", icon: PinIcon },
-  { href: "/competitors", label: "Competitors", icon: ScaleIcon },
-  { href: "/recommendations", label: "Recommendations", icon: SparkIcon },
-  { href: "/alerts", label: "Alerts", icon: BellIcon },
-  { href: "/reports", label: "Reports", icon: DocIcon },
-  { href: "/settings", label: "Settings", icon: CogIcon },
-];
+type Item = { href: string; label: string; icon: (p: { className?: string }) => JSX.Element; badge?: number };
 
-export function Sidebar({ orgName }: { orgName: string }) {
-  const pathname = usePathname() || "/dashboard";
+export function Sidebar({ orgName, openIncidents, unreadAlerts }: { orgName: string; openIncidents: number; unreadAlerts: number }) {
+  const pathname = usePathname();
+  const groups: { title: string; items: Item[] }[] = [
+    {
+      title: "Overview",
+      items: [
+        { href: "/dashboard", label: "Dashboard", icon: GridIcon },
+        { href: "/alerts", label: "Alerts Center", icon: BellIcon, badge: unreadAlerts },
+      ],
+    },
+    {
+      title: "Network",
+      items: [
+        { href: "/partners", label: "Partners", icon: UsersIcon },
+        { href: "/sites", label: "Sites", icon: PinIcon },
+        { href: "/incidents", label: "Incidents", icon: WrenchIcon, badge: openIncidents },
+        { href: "/deployments", label: "Deployments", icon: TruckIcon },
+      ],
+    },
+    {
+      title: "Business",
+      items: [
+        { href: "/revenues", label: "Revenue & Royalties", icon: CoinIcon },
+        { href: "/campaigns", label: "Campaigns", icon: MegaphoneIcon },
+        { href: "/reports", label: "Reports", icon: ChartIcon },
+        { href: "/documents", label: "Documents", icon: DocIcon },
+      ],
+    },
+  ];
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+
   return (
-    <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
-      <div className="flex h-16 items-center gap-2.5 border-b border-slate-200 px-5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">V</span>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold text-ink">VoltYield</div>
-          <div className="text-[11px] text-muted">Revenue Mgmt · EV Charging</div>
-        </div>
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+      <div className="flex h-16 items-center px-5">
+        <Link href="/dashboard">
+          <Wordmark />
+        </Link>
       </div>
-      <nav className="flex-1 space-y-1 p-3">
-        {NAV.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          const Icon = item.icon;
-          return (
-            <Link key={item.href} href={item.href} className={cn("nav-link", active && "nav-link-active")}>
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 pb-4">
+        {groups.map((g) => (
+          <div key={g.title} className="mb-5">
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{g.title}</p>
+            <ul className="space-y-0.5">
+              {g.items.map((it) => {
+                const Icon = it.icon;
+                const active = isActive(it.href);
+                return (
+                  <li key={it.href}>
+                    <Link href={it.href} className={cn("nav-link", active && "nav-link-active")}>
+                      <Icon className={cn("h-[18px] w-[18px]", active ? "text-white" : "text-slate-400")} />
+                      <span className="flex-1">{it.label}</span>
+                      {it.badge ? <span className={cn("badge", active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500")}>{it.badge}</span> : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
-      <div className="border-t border-slate-200 p-4">
-        <div className="rounded-lg bg-canvas p-3">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Organization</div>
-          <div className="mt-0.5 text-sm font-medium text-ink">{orgName}</div>
+      <div className="border-t border-slate-100 p-3">
+        <Link href="/settings" className={cn("nav-link", isActive("/settings") && "nav-link-active")}>
+          <CogIcon className={cn("h-[18px] w-[18px]", isActive("/settings") ? "text-white" : "text-slate-400")} />
+          <span>Settings</span>
+        </Link>
+        <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-white">
+            <BoltIcon className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold text-ink">{orgName}</p>
+            <p className="text-[10px] text-muted">CPO workspace</p>
+          </div>
         </div>
       </div>
     </aside>
-  );
-}
-
-/* --- minimal inline icons (no icon dependency) --- */
-type IconProps = { className?: string };
-function GridIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
-function PinIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" /><circle cx="12" cy="10" r="2.5" />
-    </svg>
-  );
-}
-function ScaleIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M12 3v18M5 7h14M7 7l-3 6a3 3 0 0 0 6 0L7 7Zm10 0-3 6a3 3 0 0 0 6 0l-3-6Z" />
-    </svg>
-  );
-}
-function SparkIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
-    </svg>
-  );
-}
-function BellIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5 2 6H4c.5-1 2-2 2-6Z" /><path d="M10 19a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}
-function DocIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M6 2h8l4 4v16H6V2Z" /><path d="M14 2v4h4M9 13h6M9 17h6" />
-    </svg>
-  );
-}
-function CogIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 7.1 3.9l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.5 1Z" />
-    </svg>
   );
 }

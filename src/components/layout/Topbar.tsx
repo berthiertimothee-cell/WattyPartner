@@ -1,42 +1,34 @@
 import Link from "next/link";
 import type { User } from "@/lib/types";
+import { titleCase } from "@/lib/utils";
+import { Avatar } from "../ui";
+import { BellIcon, SearchIcon } from "../Icons";
+import { Logo } from "./Logo";
 
 export function Topbar({ user, orgName, unreadAlerts }: { user: User; orgName: string; unreadAlerts: number }) {
-  const initials = user.name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-6 backdrop-blur lg:px-10">
-      <div className="flex items-center gap-3">
-        <span className="lg:hidden flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-bold text-white">V</span>
-        <div className="text-sm text-muted">
-          <span className="font-medium text-ink">{orgName}</span>
-          <span className="mx-2 text-slate-300">·</span>
-          <span>Pricing & Revenue Workspace</span>
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/85 px-4 backdrop-blur sm:px-6 lg:px-8">
+      <Link href="/dashboard" className="lg:hidden">
+        <Logo size={28} />
+      </Link>
+      <div className="hidden flex-1 items-center md:flex">
+        <div className="flex w-full max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
+          <SearchIcon className="h-4 w-4" />
+          <span>Search partners, sites, incidents…</span>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <Link href="/alerts" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Alerts">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-            <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5 2 6H4c.5-1 2-2 2-6Z" />
-            <path d="M10 19a2 2 0 0 0 4 0" />
-          </svg>
-          {unreadAlerts > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
-              {unreadAlerts}
-            </span>
-          )}
+      <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
+        <Link href="/alerts" className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100">
+          <BellIcon className="h-5 w-5" />
+          {unreadAlerts > 0 && <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">{unreadAlerts}</span>}
         </Link>
-        <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 py-1.5 pl-1.5 pr-3">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{initials}</span>
-          <div className="leading-tight">
-            <div className="text-xs font-semibold text-ink">{user.name}</div>
-            <div className="text-[11px] capitalize text-muted">{user.role}</div>
-          </div>
-        </div>
+        <Link href="/settings" className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-slate-100">
+          <Avatar name={user.name} color={user.avatarColor} size={32} />
+          <span className="hidden text-left leading-tight sm:block">
+            <span className="block text-sm font-medium text-ink">{user.name}</span>
+            <span className="block text-[11px] text-muted">{titleCase(user.role.replace("operator_", "")) } · {orgName}</span>
+          </span>
+        </Link>
       </div>
     </header>
   );
