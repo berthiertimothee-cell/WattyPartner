@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Wordmark } from "./Logo";
+import { WattyLogo } from "@/components/WattyLogo";
 import {
   BellIcon,
   BoltIcon,
@@ -55,34 +55,18 @@ export function Sidebar({ orgName, openIncidents, unreadAlerts }: { orgName: str
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-[272px] shrink-0 flex-col border-r border-white/60 bg-[linear-gradient(180deg,#FCFFFC_0%,#F7F3FF_100%)] lg:flex">
-      <div className="px-5 pb-4 pt-5">
-        <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-[0_12px_40px_rgba(128,147,241,0.12)] backdrop-blur">
-          <Link href="/dashboard">
-            <Wordmark />
-          </Link>
-
-          <div className="mt-5 overflow-hidden rounded-2xl bg-watty-gradient p-[1px] shadow-glow">
-            <div className="rounded-2xl bg-[#ffffffee] px-4 py-3 backdrop-blur">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-watty-gradient text-white shadow-lg">
-                  <BoltIcon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-ink">{orgName}</p>
-                  <p className="text-[11px] font-medium text-muted">Partner workspace</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
+      <div className="flex h-16 items-center border-b border-slate-200 px-5">
+        <Link href="/dashboard">
+          <WattyLogo size="md" subLabel="Partner" />
+        </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-4 pb-6">
+      <nav className="flex-1 overflow-y-auto p-3">
         {groups.map((g) => (
-          <div key={g.title} className="mb-7">
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">{g.title}</p>
-            <ul className="space-y-1.5">
+          <div key={g.title} className="mb-6">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{g.title}</p>
+            <ul className="space-y-1">
               {g.items.map((it) => {
                 const Icon = it.icon;
                 const active = isActive(it.href);
@@ -91,14 +75,9 @@ export function Sidebar({ orgName, openIncidents, unreadAlerts }: { orgName: str
                   <li key={it.href}>
                     <Link
                       href={it.href}
-                      className={cn(
-                        "group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold transition-all duration-200",
-                        active
-                          ? "bg-watty-gradient text-white shadow-[0_10px_30px_rgba(179,136,235,0.35)]"
-                          : "text-slate-600 hover:bg-white hover:text-ink hover:shadow-card",
-                      )}
+                      className={cn("nav-link", active && "nav-link-active")}
                     >
-                      <Icon className={cn("h-[18px] w-[18px]", active ? "text-white" : "text-slate-400 group-hover:text-brand")}/>
+                      <Icon className="h-4 w-4" />
                       <span className="flex-1">{it.label}</span>
 
                       {it.badge ? (
@@ -120,17 +99,16 @@ export function Sidebar({ orgName, openIncidents, unreadAlerts }: { orgName: str
         ))}
       </nav>
 
-      <div className="p-4 pt-0">
-        <Link
-          href="/settings"
-          className={cn(
-            "flex items-center gap-3 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur transition-all hover:bg-white hover:text-ink",
-            isActive("/settings") && "bg-white text-ink shadow-cardHover",
-          )}
-        >
-          <CogIcon className="h-[18px] w-[18px]" />
-          <span>Settings</span>
-        </Link>
+      <div className="border-t border-slate-200 p-4">
+        <div className="rounded-lg bg-canvas p-3">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted">Organization</div>
+          <div className="mt-0.5 flex items-center gap-2 text-sm font-medium text-ink">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-r from-[#8093F1] to-[#B388EB] text-white">
+              <BoltIcon className="h-3.5 w-3.5" />
+            </span>
+            {orgName}
+          </div>
+        </div>
       </div>
     </aside>
   );
