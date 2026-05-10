@@ -1,83 +1,104 @@
 import Link from "next/link";
 import { getBenchmark, getIncidents, getPartners, getSites } from "@/lib/data";
-import { PageHeader, Card, ActionButton, PhotoPlaceholder } from "@/components/ui";
+import { PageHeader, ActionButton } from "@/components/ui";
 import { PositionBadge, SiteStatusBadge } from "@/components/StatusBadge";
-import { BoltIcon, LeafIcon, PinIcon, PlusIcon } from "@/components/Icons";
-import { formatMoney, formatNumber, formatPercent, titleCase } from "@/lib/utils";
-import type { ElectricitySource } from "@/lib/types";
-
-const ELEC_LABEL: Record<ElectricitySource, string> = { grid: "Grid", grid_green: "Grid (green)", solar_hybrid: "Solar hybrid" };
+import { BoltIcon, PinIcon, PlusIcon } from "@/components/Icons";
+import { formatMoney, formatNumber, formatPercent } from "@/lib/utils";
 
 export default function SitesPage() {
   const sites = getSites();
   const partnerNameById = new Map(getPartners().map((p) => [p.id, p.name]));
-  const live = sites.filter((s) => s.monthly.length);
-  const totalRevenue = live.reduce((n, s) => n + s.revenuePerMonthEur, 0);
-  const totalChargers = sites.reduce((n, s) => n + s.chargerCount, 0);
+  const active = sites.filter((s) => s.status === "active").length;
+  const openIncidentsBySite = new Map(sites.map((s) => [s.id, getIncidents({ siteId: s.id, openOnly: true }).length]));
 
   return (
-    <div>
+    <div className="space-y-5">
       <PageHeader
         title="Sites"
-        subtitle="Every charging location across the network — performance, status, power and competitor positioning."
-        actions={
-          <ActionButton variant="primary">
-            <PlusIcon className="h-4 w-4" /> Add site
-          </ActionButton>
-        }
+        subtitle="Operational list designed for fast follow-up across large partner portfolios."
+        actions={<ActionButton variant="primary"><PlusIcon className="h-4 w-4" /> Add site</ActionButton>}
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <span className="pill"><PinIcon className="h-4 w-4 text-slate-400" /> {sites.length} sites · {sites.filter((s) => s.status === "active").length} active</span>
-        <span className="pill"><BoltIcon className="h-4 w-4 text-slate-400" /> {totalChargers} chargers</span>
-        <span className="pill">{formatMoney(totalRevenue)}/mo combined</span>
-        <span className="pill">{sites.filter((s) => s.status === "construction" || s.status === "planned").length} in deployment</span>
+      <div className="card card-pad">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <Kpi label="Total" value={`${sites.length}`} />
+            <Kpi label="Active" value={`${active}`} />
+            <Kpi label="Open incidents" value={`${Array.from(openIncidentsBySite.values()).reduce((a, b) => a + b, 0)}`} />
+            <Kpi label="Chargers" value={`${sites.reduce((n, s) => n + s.chargerCount, 0)}`} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Filter label="All sites" active />
+            <Filter label="Active" />
+            <Filter label="Incidents" />
+            <Filter label="Deployment" />
+            <Filter label="Needs review" />
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {sites.map((s) => {
-          const b = getBenchmark(s.id);
-          const open = getIncidents({ siteId: s.id, openOnly: true }).length;
-          return (
-            <Link key={s.id} href={`/sites/${s.id}`} className="card block overflow-hidden transition-shadow hover:shadow-cardHover">
-              <div className="relative">
-                <PhotoPlaceholder color={s.photoColor} height={132} className="rounded-none" />
-                <div className="absolute right-3 top-3 flex gap-2">
-                  {open > 0 && <span className="badge bg-white/90 text-warning">{open} open</span>}
-                  <SiteStatusBadge status={s.status} />
-                </div>
-                <div className="absolute bottom-3 left-4 right-4">
-                  <p className="truncate text-sm font-semibold text-white drop-shadow">{s.name}</p>
-                  <p className="text-[11px] text-white/85">{partnerNameById.get(s.partnerId)} · {s.city}</p>
-                </div>
-              </div>
-              <div className="card-pad">
-                <div className="grid grid-cols-3 gap-2">
-                  <Cell label="Revenue / mo" value={s.monthly.length ? formatMoney(s.revenuePerMonthEur) : "—"} />
-                  <Cell label="Uptime" value={s.monthly.length ? formatPercent(s.uptimePct, 1) : "—"} />
-                  <Cell label="Sessions / day" value={s.monthly.length ? formatNumber(s.sessionsPerDay) : "—"} />
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-[11px] text-muted">
-                  <span className="pill !px-2 !py-0.5 !text-[11px]"><BoltIcon className="h-3.5 w-3.5" /> {s.chargerCount} · {s.totalPowerKw} kW</span>
-                  {(s.electricitySource === "grid_green" || s.electricitySource === "solar_hybrid") && (
-                    <span className="pill !px-2 !py-0.5 !text-[11px] !text-success"><LeafIcon className="h-3.5 w-3.5" /> {ELEC_LABEL[s.electricitySource]}</span>
-                  )}
-                  {b && <PositionBadge position={b.position} />}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-400">
+              <PinIcon className="h-4 w-4" />
+              <span>Search site, partner, city...</span>
+            </div>
+            <select className="input max-w-[170px]"><option>Status</option></select>
+            <select className="input max-w-[180px]"><option>Partner</option></select>
+            <select className="input max-w-[180px]"><option>Sort by revenue</option></select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="bg-slate-50/70">
+              <tr>
+                <th className="px-4 py-3">Site</th>
+                <th className="px-4 py-3">Partner</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Power</th>
+                <th className="px-4 py-3">Revenue</th>
+                <th className="px-4 py-3">Sessions</th>
+                <th className="px-4 py-3">Uptime</th>
+                <th className="px-4 py-3">Position</th>
+                <th className="px-4 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sites.map((s) => {
+                const b = getBenchmark(s.id);
+                const open = openIncidentsBySite.get(s.id) ?? 0;
+                return (
+                  <tr key={s.id} className="table-row hover:bg-slate-50/80">
+                    <td className="px-4 py-3">
+                      <Link href={`/sites/${s.id}`} className="font-semibold text-ink hover:text-brand-600">{s.name}</Link>
+                      <div className="text-xs text-muted">{s.city}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted">{partnerNameById.get(s.partnerId)}</td>
+                    <td className="px-4 py-3"><SiteStatusBadge status={s.status} /></td>
+                    <td className="px-4 py-3 tabular-nums"><BoltIcon className="mr-1 inline h-3.5 w-3.5 text-slate-400" />{s.chargerCount} · {s.totalPowerKw} kW</td>
+                    <td className="px-4 py-3 tabular-nums font-medium">{s.monthly.length ? formatMoney(s.revenuePerMonthEur) : "—"}</td>
+                    <td className="px-4 py-3 tabular-nums">{s.monthly.length ? formatNumber(s.sessionsPerDay) : "—"}/day</td>
+                    <td className="px-4 py-3 tabular-nums">{s.monthly.length ? formatPercent(s.uptimePct, 1) : "—"}</td>
+                    <td className="px-4 py-3">{b ? <PositionBadge position={b.position} /> : <span className="text-xs text-slate-400">—</span>}</td>
+                    <td className="px-4 py-3">
+                      {open > 0 ? <Link href={`/sites/${s.id}`} className="badge bg-amber-50 text-warning">{open} open</Link> : <Link href={`/sites/${s.id}`} className="text-xs font-semibold text-brand-600">Review</Link>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
 
-function Cell({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{value}</div>
-    </div>
-  );
+function Kpi({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-slate-50 px-3 py-2"><div className="stat-label">{label}</div><div className="mt-1 text-lg font-bold tabular-nums text-ink">{value}</div></div>;
+}
+function Filter({ label, active }: { label: string; active?: boolean }) {
+  return <button className={active ? "rounded-xl bg-watty-gradient px-3 py-2 text-xs font-bold text-white" : "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"}>{label}</button>;
 }
