@@ -1,133 +1,119 @@
-// Seed the database from the mock dataset.
-//
-// Usage (after configuring DATABASE_URL and running `prisma migrate dev`):
-//   npm run seed
-//
-// This is intentionally minimal — it mirrors src/lib/mock-data.ts into Postgres
-// so a freshly migrated database matches the MVP's mock state. Recommendations
-// and alerts are derived at runtime by the engine and are not seeded here.
-
+/**
+ * PartnerOS — database seed.
+ *
+ * Loads the demo dataset (the same one the MVP serves from memory) into
+ * Postgres via Prisma. Run with `npm run seed` after `prisma migrate dev`.
+ *
+ * For brevity this seeds the core entities and the maintenance providers; the
+ * site metric series, incidents, reports, deployments, campaigns and documents
+ * follow the exact same pattern using the arrays exported from
+ * `src/lib/mock-data.ts`. Extend `main()` to load them all when wiring the
+ * production database.
+ */
 import { PrismaClient } from "@prisma/client";
 import {
-  ORGANIZATION,
-  USERS,
-  SITES,
-  COMPETITORS,
-  PRICE_OBSERVATIONS,
-  chargersForSite,
-  utilizationForSite,
+  campaigns,
+  chargers,
+  contracts,
+  deployments,
+  documents,
+  incidents,
+  maintenanceProviders,
+  notifications,
+  organization,
+  partners,
+  revenueReports,
+  sites,
+  users,
 } from "../src/lib/mock-data";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding VoltYield database from mock data…");
-
   await prisma.organization.upsert({
-    where: { id: ORGANIZATION.id },
+    where: { id: organization.id },
     update: {},
     create: {
-      id: ORGANIZATION.id,
-      name: ORGANIZATION.name,
-      country: ORGANIZATION.country,
-      currency: ORGANIZATION.currency,
-      targetGapAbove: ORGANIZATION.settings.targetGapAbove,
-      lowUtilizationThreshold: ORGANIZATION.settings.lowUtilizationThreshold,
-      highUtilizationThreshold: ORGANIZATION.settings.highUtilizationThreshold,
-      minPriceStep: ORGANIZATION.settings.minPriceStep,
-      autoApply: ORGANIZATION.settings.autoApply,
-      createdAt: new Date(ORGANIZATION.createdAt),
+      id: organization.id,
+      name: organization.name,
+      legalName: organization.legalName,
+      country: organization.country,
+      currency: organization.currency,
+      contactEmail: organization.contactEmail,
     },
   });
 
-  for (const u of USERS) {
+  for (const u of users) {
     await prisma.user.upsert({
       where: { id: u.id },
       update: {},
+      create: { id: u.id, organizationId: u.organizationId, name: u.name, email: u.email, role: u.role as any, avatarColor: u.avatarColor, partnerId: u.partnerId ?? null },
+    });
+  }
+
+  for (const p of partners) {
+    await prisma.partner.upsert({
+      where: { id: p.id },
+      update: {},
       create: {
-        id: u.id,
-        organizationId: u.organizationId,
-        email: u.email,
-        name: u.name,
-        role: u.role,
-        createdAt: new Date(u.createdAt),
+        id: p.id,
+        organizationId: p.organizationId,
+        name: p.name,
+        type: p.type as any,
+        contactName: p.contactName,
+        contactEmail: p.contactEmail,
+        contactPhone: p.contactPhone ?? null,
+        city: p.city,
+        region: p.region,
+        logoColor: p.logoColor,
+        since: new Date(p.since),
+        royaltyRate: p.royaltyRate,
+        status: p.status as any,
+        lastContactAt: new Date(p.lastContactAt),
+        accountManagerId: p.accountManagerId,
       },
     });
   }
 
-  for (const s of SITES) {
+  for (const mp of maintenanceProviders) {
+    await prisma.maintenanceProvider.upsert({
+      where: { id: mp.id },
+      update: {},
+      create: { id: mp.id, organizationId: mp.organizationId, name: mp.name, contactEmail: mp.contactEmail, phone: mp.phone, regions: mp.regions, avgResolutionHours: mp.avgResolutionHours, rating: mp.rating },
+    });
+  }
+
+  for (const s of sites) {
     await prisma.site.upsert({
       where: { id: s.id },
       update: {},
       create: {
         id: s.id,
         organizationId: s.organizationId,
+        partnerId: s.partnerId,
         name: s.name,
         address: s.address,
         city: s.city,
+        region: s.region,
         country: s.country,
         lat: s.lat,
         lng: s.lng,
+        photoColor: s.photoColor,
+        status: s.status as any,
+        electricitySource: s.electricitySource as any,
+        commissionedAt: s.commissionedAt ? new Date(s.commissionedAt) : null,
+        expectedGoLive: s.expectedGoLive ? new Date(s.expectedGoLive) : null,
         operatorName: s.operatorName,
-        maxPowerKw: s.maxPowerKw,
-        currentPricePerKwh: s.currentPricePerKwh,
-        currency: s.currency,
-        utilizationRate: s.utilizationRate,
-        sessionsPerDay: s.sessionsPerDay,
-        revenuePerMonth: s.revenuePerMonth,
-        uptime: s.uptime,
-        status: s.status,
-        createdAt: new Date(s.createdAt),
-      },
-    });
-
-    for (const c of chargersForSite(s.id)) {
-      await prisma.charger.upsert({
-        where: { id: c.id },
-        update: {},
-        create: { id: c.id, siteId: c.siteId, label: c.label, powerKw: c.powerKw, connectorTypes: c.connectorTypes, count: c.count },
-      });
-    }
-
-    const util = utilizationForSite(s.id);
-    if (util) {
-      await prisma.utilizationData.create({
-        data: { siteId: s.id, asOf: new Date(util.asOf), hourly: util.hourly as unknown as object, weekday: util.weekday },
-      });
-    }
-  }
-
-  for (const c of COMPETITORS) {
-    await prisma.competitor.upsert({
-      where: { id: c.id },
-      update: {},
-      create: {
-        id: c.id,
-        siteId: c.siteId,
-        name: c.name,
-        operatorName: c.operatorName,
-        lat: c.lat,
-        lng: c.lng,
-        distanceKm: c.distanceKm,
-        maxPowerKw: c.maxPowerKw,
-        pricePerKwh: c.pricePerKwh,
-        currency: c.currency,
-        availability: c.availability,
-        source: c.source,
-        lastSeenAt: new Date(c.lastSeenAt),
+        chargers: { create: chargers.filter((c) => c.siteId === s.id).map((c) => ({ id: c.id, model: c.model, vendor: c.vendor, powerKw: c.powerKw, connectors: c.connectors, type: c.type as any, status: c.status as any, commissionedAt: new Date(c.commissionedAt) })) },
+        monthlyMetrics: { create: s.monthly.map((m) => ({ month: m.month, sessions: m.sessions, energyKwh: m.energyKwh, revenueEur: m.revenueEur, uptimePct: m.uptimePct, avgPriceEurKwh: m.avgPriceEurKwh })) },
       },
     });
   }
 
-  for (const o of PRICE_OBSERVATIONS) {
-    await prisma.priceObservation.upsert({
-      where: { id: o.id },
-      update: {},
-      create: { id: o.id, siteId: o.siteId, competitorId: o.competitorId ?? undefined, pricePerKwh: o.pricePerKwh, currency: o.currency, observedAt: new Date(o.observedAt), source: o.source },
-    });
-  }
-
-  console.log("Done.");
+  console.log(
+    `Seeded: 1 org, ${users.length} users, ${partners.length} partners, ${maintenanceProviders.length} providers, ${sites.length} sites, ${chargers.length} chargers.\n` +
+      `Remaining demo arrays available for loading: incidents=${incidents.length}, revenueReports=${revenueReports.length}, deployments=${deployments.length}, campaigns=${campaigns.length}, documents=${documents.length}, contracts=${contracts.length}, notifications=${notifications.length}.`,
+  );
 }
 
 main()
@@ -135,6 +121,4 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

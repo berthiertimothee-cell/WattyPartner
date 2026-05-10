@@ -1,8 +1,8 @@
 {
-  "name": "voltyield",
+  "name": "partneros",
   "version": "0.1.0",
   "private": true,
-  "description": "VoltYield — Revenue Management for EV Charging. Dynamic pricing & benchmarking platform for EV charging operators.",
+  "description": "PartnerOS by Watty — a Partner Success Platform for EV charging networks (CPOs). Centralizes partner communication, site performance, incidents, royalties, deployments, campaigns, documents and AI-generated summaries.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

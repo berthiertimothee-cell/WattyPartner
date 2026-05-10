@@ -17,7 +17,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Thin, unobtrusive scrollbars to match the minimalist B2B look. */
+/* Thin, unobtrusive scrollbars to match the minimalist look. */
 * {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
@@ -33,22 +33,25 @@ body {
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-card;
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card;
   }
   .card-pad {
-    @apply p-5;
+    @apply p-5 sm:p-6;
   }
   .stat-label {
-    @apply text-xs font-medium uppercase tracking-wide text-muted;
+    @apply text-[11px] font-semibold uppercase tracking-wide text-muted;
+  }
+  .section-title {
+    @apply text-sm font-semibold text-ink;
   }
   .nav-link {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-ink;
+    @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-ink;
   }
   .nav-link-active {
     @apply bg-brand text-white hover:bg-brand hover:text-white;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
     @apply btn bg-brand text-white hover:bg-[#0a1a40];
@@ -60,12 +63,18 @@ body {
     @apply btn text-slate-600 hover:bg-slate-100;
   }
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600;
   }
   .table-row {
     @apply border-t border-slate-100;
   }
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-ink placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15;
+  }
   th {
-    @apply text-left text-xs font-semibold uppercase tracking-wide text-muted;
+    @apply text-left text-[11px] font-semibold uppercase tracking-wide text-muted;
   }
 }

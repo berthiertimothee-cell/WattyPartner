@@ -1,9 +1,9 @@
-// VoltYield database schema.
+// PartnerOS by Watty — database schema.
 //
-// This is the target persistence model for the platform. The MVP ships with an
-// in-memory mock data layer (src/lib/mock-data.ts + src/lib/data.ts) so the app
-// runs with zero infrastructure; when going live, run `prisma migrate dev` and
-// re-implement the bodies of src/lib/data.ts using PrismaClient.
+// This is the target persistence model. The MVP ships with an in-memory mock
+// data layer (src/lib/mock-data.ts → src/lib/data.ts) so the app runs without a
+// database. Point DATABASE_URL at Postgres and run `prisma migrate dev` to go
+// live; the API and pages don't change.
 
 generator client {
   provider = "prisma-client-js"
@@ -14,48 +14,524 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  owner
-  admin
-  analyst
-  viewer
+// --- Identity --------------------------------------------------------------
+
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  legalName    String
+  country      String
+  currency     String   @default("EUR")
+  contactEmail String
+  createdAt    DateTime @default(now())
+
+  users               User[]
+  partners            Partner[]
+  sites               Site[]
+  incidents           Incident[]
+  maintenanceProviders MaintenanceProvider[]
+  revenueReports      RevenueReport[]
+  deployments         Deployment[]
+  campaigns           Campaign[]
+  documents           DocumentItem[]
+  contracts           Contract[]
+  notifications       Notification[]
+  aiSummaries         AiSummary[]
 }
 
-enum Currency {
-  EUR
-  USD
-  GBP
+enum UserRole {
+  operator_admin
+  operator_member
+  partner
 }
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String   @unique
+  role           UserRole
+  avatarColor    String   @default("#0B1F4D")
+  partnerId      String?
+  partner        Partner? @relation("PartnerUsers", fields: [partnerId], references: [id])
+  createdAt      DateTime @default(now())
+
+  managedPartners Partner[] @relation("AccountManager")
+}
+
+// --- Partners --------------------------------------------------------------
+
+enum PartnerType {
+  retail
+  hospitality
+  real_estate
+  fleet
+  municipality
+  workplace
+}
+
+enum PartnerStatus {
+  active
+  onboarding
+  churned
+}
+
+model Partner {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  name           String
+  type           PartnerType
+  contactName    String
+  contactEmail   String
+  contactPhone   String?
+  city           String
+  region         String
+  logoColor      String        @default("#1E4ED8")
+  since          DateTime
+  royaltyRate    Float         @default(0.15)
+  status         PartnerStatus @default(active)
+  lastContactAt  DateTime
+  accountManagerId String
+  accountManager User          @relation("AccountManager", fields: [accountManagerId], references: [id])
+
+  users         User[]          @relation("PartnerUsers")
+  sites         Site[]
+  revenueReports RevenueReport[]
+  deployments   Deployment[]
+  campaigns     Campaign[]
+  documents     DocumentItem[]
+  contracts     Contract[]
+  notifications Notification[]
+}
+
+// --- Sites & chargers ------------------------------------------------------
 
 enum SiteStatus {
   active
   maintenance
+  construction
   planned
+  offline
 }
 
-enum DataSource {
-  mock
-  openchargemap
-  chargeprice
-  google_places
-  roaming_api
-  csv_import
-  manual
+enum ElectricitySource {
+  grid
+  grid_green
+  solar_hybrid
 }
 
-enum RecommendationType {
-  lower_price
-  raise_price
-  happy_hour
-  hold_price
-  promo_test
+model Site {
+  id                String            @id @default(cuid())
+  organizationId    String
+  organization      Organization      @relation(fields: [organizationId], references: [id])
+  partnerId         String
+  partner           Partner           @relation(fields: [partnerId], references: [id])
+  name              String
+  address           String
+  city              String
+  region            String
+  country           String            @default("France")
+  lat               Float
+  lng               Float
+  photoColor        String            @default("#0B1F4D")
+  status            SiteStatus        @default(active)
+  electricitySource ElectricitySource @default(grid)
+  commissionedAt    DateTime?
+  expectedGoLive    DateTime?
+  operatorName      String
+  createdAt         DateTime          @default(now())
+
+  chargers       Charger[]
+  monthlyMetrics SiteMonthlyMetric[]
+  incidents      Incident[]
+  deployments    Deployment[]
+  campaigns      CampaignSite[]
+  documents      DocumentItem[]
+  benchmark      SiteBenchmark?
+  revenueReportSites RevenueReportSite[]
 }
 
-enum RecommendationStatus {
+enum ChargerType {
+  AC
+  DC
+}
+
+enum ChargerStatus {
+  available
+  charging
+  faulted
+  offline
+  maintenance
+}
+
+model Charger {
+  id             String        @id @default(cuid())
+  siteId         String
+  site           Site          @relation(fields: [siteId], references: [id])
+  model          String
+  vendor         String
+  powerKw        Int
+  connectors     Int           @default(1)
+  type           ChargerType
+  status         ChargerStatus @default(available)
+  commissionedAt DateTime
+
+  incidents Incident[]
+}
+
+model SiteMonthlyMetric {
+  id            String @id @default(cuid())
+  siteId        String
+  site          Site   @relation(fields: [siteId], references: [id])
+  month         String // YYYY-MM
+  sessions      Int
+  energyKwh     Int
+  revenueEur    Int
+  uptimePct     Float
+  avgPriceEurKwh Float
+
+  @@unique([siteId, month])
+}
+
+// --- Incidents & maintenance ----------------------------------------------
+
+enum IncidentStatus {
   open
-  accepted
-  dismissed
-  exported
+  in_progress
+  waiting_external
+  scheduled
+  resolved
+}
+
+enum IncidentCategory {
+  hardware_fault
+  connectivity
+  vandalism
+  cable_theft
+  power_supply
+  payment_terminal
+  software
+  other
+}
+
+enum IncidentSeverity {
+  low
+  medium
+  high
+}
+
+model MaintenanceProvider {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id])
+  name               String
+  contactEmail       String
+  phone              String
+  regions            String[]
+  avgResolutionHours Int
+  rating             Float
+
+  incidents Incident[]
+}
+
+model Incident {
+  id                   String           @id @default(cuid())
+  organizationId       String
+  organization         Organization     @relation(fields: [organizationId], references: [id])
+  siteId               String
+  site                 Site             @relation(fields: [siteId], references: [id])
+  chargerId            String?
+  charger              Charger?         @relation(fields: [chargerId], references: [id])
+  title                String
+  description          String
+  category             IncidentCategory
+  status               IncidentStatus   @default(open)
+  severity             IncidentSeverity @default(medium)
+  openedAt             DateTime         @default(now())
+  resolvedAt           DateTime?
+  slaDueAt             DateTime
+  etaAt                DateTime?
+  maintenanceProviderId String?
+  maintenanceProvider  MaintenanceProvider? @relation(fields: [maintenanceProviderId], references: [id])
+  photoColors          String[]
+
+  events IncidentEvent[]
+}
+
+model IncidentEvent {
+  id         String   @id @default(cuid())
+  incidentId String
+  incident   Incident @relation(fields: [incidentId], references: [id])
+  at         DateTime
+  label      String
+  by         String
+}
+
+// --- Revenue & royalties ---------------------------------------------------
+
+enum ReportStatus {
+  draft
+  issued
+  paid
+}
+
+model RevenueReport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  partnerId      String
+  partner        Partner      @relation(fields: [partnerId], references: [id])
+  month          String // YYYY-MM
+  grossRevenueEur Int
+  energyCostEur   Int
+  platformFeeEur  Int
+  royaltyEur      Int
+  status         ReportStatus @default(draft)
+  issuedAt       DateTime?
+  paidAt         DateTime?
+  discrepancyDetected Boolean @default(false)
+  discrepancyNote String?
+
+  lines RoyaltyLine[]
+  sites RevenueReportSite[]
+
+  @@unique([partnerId, month])
+}
+
+enum RoyaltyLineKind {
+  gross_revenue
+  energy_cost
+  platform_fee
+  adjustment
+  royalty
+}
+
+model RoyaltyLine {
+  id        String          @id @default(cuid())
+  reportId  String
+  report    RevenueReport   @relation(fields: [reportId], references: [id])
+  label     String
+  amountEur Int
+  kind      RoyaltyLineKind
+}
+
+model RevenueReportSite {
+  reportId String
+  report   RevenueReport @relation(fields: [reportId], references: [id])
+  siteId   String
+  site     Site          @relation(fields: [siteId], references: [id])
+
+  @@id([reportId, siteId])
+}
+
+// --- Deployments -----------------------------------------------------------
+
+enum DeploymentStage {
+  site_survey
+  permitting
+  grid_connection
+  civil_works
+  equipment_delivery
+  installation
+  commissioning
+  go_live
+}
+
+enum MilestoneStatus {
+  done
+  in_progress
+  blocked
+  pending
+}
+
+model Deployment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  partnerId      String
+  partner        Partner      @relation(fields: [partnerId], references: [id])
+  siteId         String
+  site           Site         @relation(fields: [siteId], references: [id])
+  name           String
+  city           String
+  region         String
+  progress       Float        @default(0)
+  expectedGoLive DateTime
+  delayed        Boolean      @default(false)
+  delayReason    String?
+  plannedChargers Int
+  plannedPowerKw  Int
+
+  milestones DeploymentMilestone[]
+  documents  DocumentItem[]
+}
+
+model DeploymentMilestone {
+  id           String          @id @default(cuid())
+  deploymentId String
+  deployment   Deployment      @relation(fields: [deploymentId], references: [id])
+  stage        DeploymentStage
+  label        String
+  status       MilestoneStatus @default(pending)
+  plannedAt    DateTime
+  completedAt  DateTime?
+  note         String?
+}
+
+// --- Competitor benchmark --------------------------------------------------
+
+enum BenchmarkPosition {
+  underpriced
+  aligned
+  overpriced
+  unknown
+}
+
+model SiteBenchmark {
+  id                 String            @id @default(cuid())
+  siteId             String            @unique
+  site               Site              @relation(fields: [siteId], references: [id])
+  ourPriceEurKwh     Float
+  ourMaxPowerKw      Int
+  ourUtilizationPct  Float
+  marketSharePct     Float
+  position           BenchmarkPosition @default(unknown)
+
+  competitors CompetitorPoint[]
+}
+
+model CompetitorPoint {
+  id                      String        @id @default(cuid())
+  benchmarkId             String
+  benchmark               SiteBenchmark @relation(fields: [benchmarkId], references: [id])
+  brand                   String
+  distanceKm              Float
+  maxPowerKw              Int
+  priceEurKwh             Float
+  estimatedUtilizationPct Float
+}
+
+// --- Campaigns -------------------------------------------------------------
+
+enum CampaignType {
+  promo_code
+  session_discount
+  onboarding
+  reopening
+  retailer
+  fleet
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  active
+  completed
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  partnerId      String
+  partner        Partner        @relation(fields: [partnerId], references: [id])
+  name           String
+  type           CampaignType
+  status         CampaignStatus @default(draft)
+  startsAt       DateTime
+  endsAt         DateTime
+  promoCode      String?
+  discountPct    Float?
+  sessionsGenerated Int          @default(0)
+  promoRedemptions  Int          @default(0)
+  estimatedUpliftPct Float       @default(0)
+  budgetEur      Int            @default(0)
+
+  sites CampaignSite[]
+}
+
+model CampaignSite {
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  siteId     String
+  site       Site     @relation(fields: [siteId], references: [id])
+
+  @@id([campaignId, siteId])
+}
+
+// --- Documents & contracts -------------------------------------------------
+
+enum DocumentKind {
+  contract
+  amendment
+  invoice
+  report
+  permit
+  technical
+  signed_pdf
+  other
+}
+
+model DocumentItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  partnerId      String?
+  partner        Partner?     @relation(fields: [partnerId], references: [id])
+  siteId         String?
+  site           Site?        @relation(fields: [siteId], references: [id])
+  deploymentId   String?
+  deployment     Deployment?  @relation(fields: [deploymentId], references: [id])
+  name           String
+  kind           DocumentKind
+  sizeKb         Int
+  uploadedAt     DateTime     @default(now())
+  uploadedBy     String
+  url            String
+}
+
+enum ContractType {
+  framework
+  site_specific
+  amendment
+}
+
+enum ContractStatus {
+  active
+  expired
+  pending_signature
+}
+
+model Contract {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  partnerId      String
+  partner        Partner        @relation(fields: [partnerId], references: [id])
+  title          String
+  type           ContractType
+  status         ContractStatus @default(active)
+  startsAt       DateTime
+  endsAt         DateTime
+  royaltyRate    Float
+  documentId     String?
+  signedBy       String?
+}
+
+// --- Notifications / alerts ------------------------------------------------
+
+enum NotificationType {
+  uptime_drop
+  charger_offline
+  revenue_decline
+  missing_invoice
+  deployment_delay
+  unresolved_incident
+  utilization_opportunity
+  partner_inactivity
+  discrepancy
 }
 
 enum Severity {
@@ -65,184 +541,42 @@ enum Severity {
   critical
 }
 
-enum AlertType {
-  competitor_price_change
-  site_overpriced
-  site_underpriced
-  utilization_drop
-  revenue_opportunity
-  high_demand_window
-}
-
-model Organization {
-  id              String   @id @default(cuid())
-  name            String
-  country         String
-  currency        Currency @default(EUR)
-  // Engine knobs (see OrgSettings in src/lib/types.ts).
-  targetGapAbove          Float   @default(0.05)
-  lowUtilizationThreshold Float   @default(0.35)
-  highUtilizationThreshold Float  @default(0.65)
-  minPriceStep            Float   @default(0.01)
-  autoApply               Boolean @default(false)
-  createdAt       DateTime @default(now())
-  users           User[]
-  sites           Site[]
-  reports         Report[]
-}
-
-model User {
-  id             String       @id @default(cuid())
-  organization   Organization @relation(fields: [organizationId], references: [id])
+model Notification {
+  id             String           @id @default(cuid())
   organizationId String
-  email          String       @unique
-  name           String
-  role           Role         @default(analyst)
-  createdAt      DateTime     @default(now())
-
-  @@index([organizationId])
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  type           NotificationType
+  severity       Severity         @default(info)
+  title          String
+  body           String
+  createdAt      DateTime         @default(now())
+  read           Boolean          @default(false)
+  partnerId      String?
+  partner        Partner?         @relation(fields: [partnerId], references: [id])
+  siteId         String?
+  href           String?
 }
 
-model Site {
-  id                 String       @id @default(cuid())
-  organization       Organization @relation(fields: [organizationId], references: [id])
-  organizationId     String
-  name               String
-  address            String
-  city               String
-  country            String
-  lat                Float
-  lng                Float
-  operatorName       String
-  maxPowerKw         Int
-  currentPricePerKwh Float
-  currency           Currency     @default(EUR)
-  utilizationRate    Float        // 0..1, trailing 30d
-  sessionsPerDay     Float
-  revenuePerMonth    Float
-  uptime             Float        // 0..1
-  status             SiteStatus   @default(active)
-  createdAt          DateTime     @default(now())
+// --- AI summaries ----------------------------------------------------------
 
-  chargers           Charger[]
-  competitors        Competitor[]
-  priceObservations  PriceObservation[]
-  utilizationData    UtilizationData[]
-  recommendations    Recommendation[]
-  alerts             Alert[]
-
-  @@index([organizationId])
+enum AiSummaryScope {
+  site
+  partner
+  incident
+  monthly_report
+  deployment
 }
 
-model Charger {
-  id             String   @id @default(cuid())
-  site           Site     @relation(fields: [siteId], references: [id])
-  siteId         String
-  label          String
-  powerKw        Int
-  connectorTypes String[] // e.g. ["CCS","CHAdeMO"]
-  count          Int      @default(1)
-
-  @@index([siteId])
-}
-
-model Competitor {
-  id           String     @id @default(cuid())
-  site         Site       @relation(fields: [siteId], references: [id])
-  siteId       String
-  name         String
-  operatorName String
-  lat          Float
-  lng          Float
-  distanceKm   Float
-  maxPowerKw   Int
-  pricePerKwh  Float?
-  currency     Currency   @default(EUR)
-  availability Float?     // 0..1 or null
-  source       DataSource @default(mock)
-  lastSeenAt   DateTime   @default(now())
-
-  priceObservations PriceObservation[]
-
-  @@index([siteId])
-}
-
-model PriceObservation {
-  id           String      @id @default(cuid())
-  site         Site        @relation(fields: [siteId], references: [id])
-  siteId       String
-  competitor   Competitor? @relation(fields: [competitorId], references: [id])
-  competitorId String?
-  pricePerKwh  Float
-  currency     Currency    @default(EUR)
-  observedAt   DateTime    @default(now())
-  source       DataSource  @default(mock)
-
-  @@index([siteId])
-  @@index([competitorId])
-}
-
-model UtilizationData {
-  id        String   @id @default(cuid())
-  site      Site     @relation(fields: [siteId], references: [id])
-  siteId    String
-  asOf      DateTime
-  // 24 hourly utilization values (0..1) and 24 hourly session counts.
-  hourly    Json
-  // 7 weekday averages (0..1), index 0 = Monday.
-  weekday   Float[]
-  createdAt DateTime @default(now())
-
-  @@index([siteId])
-}
-
-model Recommendation {
-  id                 String               @id @default(cuid())
-  site               Site                 @relation(fields: [siteId], references: [id])
-  siteId             String
-  type               RecommendationType
-  severity           Severity             @default(info)
-  title              String
-  rationale          String
-  action             String
-  suggestedPriceDelta Float?
-  window             String?
-  // estimatedImpact { sessionsChangePct, revenueChangePct, revenueChangePerMonth }
-  estimatedImpact    Json
-  // signals that triggered the rule (for transparency / audit)
-  signals            Json
-  status             RecommendationStatus @default(open)
-  createdAt          DateTime             @default(now())
-
-  @@index([siteId])
-  @@index([status])
-}
-
-model Alert {
-  id        String    @id @default(cuid())
-  site      Site      @relation(fields: [siteId], references: [id])
-  siteId    String
-  type      AlertType
-  severity  Severity  @default(info)
-  title     String
-  message   String
-  data      Json
-  read      Boolean   @default(false)
-  createdAt DateTime  @default(now())
-
-  @@index([siteId])
-  @@index([read])
-}
-
-model Report {
-  id             String       @id @default(cuid())
-  organization   Organization @relation(fields: [organizationId], references: [id])
+model AiSummary {
+  id             String         @id @default(cuid())
   organizationId String
-  periodStart    DateTime
-  periodLabel    String
-  generatedAt    DateTime     @default(now())
-  // ReportSummary (see src/lib/types.ts)
-  summary        Json
-
-  @@index([organizationId])
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  scope          AiSummaryScope
+  refId          String
+  headline       String
+  body           String
+  bullets        String[]
+  actions        String[]
+  generatedAt    DateTime       @default(now())
+  model          String
 }

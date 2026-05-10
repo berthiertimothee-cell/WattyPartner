@@ -1,267 +1,355 @@
-// VoltYield domain types — shared across data layer, API routes, and UI.
-// These mirror the Prisma schema in /prisma/schema.prisma so the mock data
-// layer can be swapped for a real database with minimal changes.
-
-export type ID = string;
-
-export type Currency = "EUR" | "USD" | "GBP";
-
-export type ConnectorType = "CCS" | "CHAdeMO" | "Type2" | "Tesla" | "GB/T";
-
-export interface Organization {
-  id: ID;
-  name: string;
-  country: string;
-  currency: Currency;
-  /** Pricing strategy knobs used by the recommendation engine. */
-  settings: OrgSettings;
-  createdAt: string;
-}
-
-export interface OrgSettings {
-  /** Target margin headroom over local competitor average, as a fraction (0.05 = 5%). */
-  targetGapAbove: number;
-  /** Below this utilization we consider a site under-utilized. */
-  lowUtilizationThreshold: number;
-  /** Above this utilization we consider a site saturated / high demand. */
-  highUtilizationThreshold: number;
-  /** Minimum price step the operator is willing to move, in currency units per kWh. */
-  minPriceStep: number;
-  /** Whether automated price pushes are enabled (always false in MVP). */
-  autoApply: boolean;
-}
-
-export type Role = "owner" | "admin" | "analyst" | "viewer";
-
-export interface User {
-  id: ID;
-  organizationId: ID;
-  email: string;
-  name: string;
-  role: Role;
-  createdAt: string;
-}
-
-export interface Site {
-  id: ID;
-  organizationId: ID;
-  name: string;
-  address: string;
-  city: string;
-  country: string;
-  lat: number;
-  lng: number;
-  operatorName: string;
-  /** Max charger power available at the site, kW. */
-  maxPowerKw: number;
-  currentPricePerKwh: number;
-  currency: Currency;
-  /** 0..1 — share of time stalls are in use over the trailing 30 days. */
-  utilizationRate: number;
-  sessionsPerDay: number;
-  revenuePerMonth: number;
-  /** 0..1 — share of time the site is operational. */
-  uptime: number;
-  chargers: Charger[];
-  status: "active" | "maintenance" | "planned";
-  createdAt: string;
-}
-
-export interface Charger {
-  id: ID;
-  siteId: ID;
-  label: string;
-  powerKw: number;
-  connectorTypes: ConnectorType[];
-  count: number;
-}
-
-export interface Competitor {
-  id: ID;
-  /** Site this competitor was discovered near. */
-  siteId: ID;
-  name: string;
-  operatorName: string;
-  lat: number;
-  lng: number;
-  /** Straight-line distance from our site, km. */
-  distanceKm: number;
-  maxPowerKw: number;
-  pricePerKwh: number | null;
-  currency: Currency;
-  /** 0..1, or null if the provider does not expose live availability. */
-  availability: number | null;
-  source: DataSource;
-  lastSeenAt: string;
-}
-
-export type DataSource =
-  | "mock"
-  | "openchargemap"
-  | "chargeprice"
-  | "google_places"
-  | "roaming_api"
-  | "csv_import"
-  | "manual";
-
-export interface PriceObservation {
-  id: ID;
-  competitorId: ID | null;
-  siteId: ID;
-  pricePerKwh: number;
-  currency: Currency;
-  observedAt: string;
-  source: DataSource;
-}
-
-export interface UtilizationPoint {
-  /** Hour of day, 0..23. */
-  hour: number;
-  /** 0..1 utilization for that hour, averaged over the period. */
-  utilization: number;
-  /** Estimated sessions in that hour. */
-  sessions: number;
-}
-
-export interface UtilizationData {
-  siteId: ID;
-  /** ISO date the series was computed for (most recent 7-day average). */
-  asOf: string;
-  hourly: UtilizationPoint[];
-  /** 0=Mon .. 6=Sun average utilization. */
-  weekday: number[];
-}
-
-export type RecommendationType =
-  | "lower_price"
-  | "raise_price"
-  | "happy_hour"
-  | "hold_price"
-  | "promo_test";
-
-export type RecommendationStatus = "open" | "accepted" | "dismissed" | "exported";
+// PartnerOS — domain types
+// A Partner Success Platform for EV charging networks (CPOs).
+// These types mirror the Prisma schema in /prisma/schema.prisma so the mock
+// data layer in src/lib/mock-data.ts can be swapped for a real database.
 
 export type Severity = "info" | "opportunity" | "warning" | "critical";
 
-export interface Recommendation {
-  id: ID;
-  siteId: ID;
-  type: RecommendationType;
-  severity: Severity;
-  /** Short headline shown in lists. */
-  title: string;
-  /** One or two sentence explanation — rule-based, optionally rephrased by an LLM. */
-  rationale: string;
-  /** Concrete suggested action, human readable. */
-  action: string;
-  /** Suggested price delta per kWh (can be negative). null for non-price actions. */
-  suggestedPriceDelta: number | null;
-  /** Optional time window the action applies to, e.g. "18:00-22:00". */
-  window?: string;
-  /** Estimated impact, for the UI. */
-  estimatedImpact: {
-    sessionsChangePct?: number;
-    revenueChangePct?: number;
-    revenueChangePerMonth?: number;
-  };
-  /** Inputs that triggered the rule — useful for transparency / debugging. */
-  signals: Record<string, number | string | boolean>;
-  status: RecommendationStatus;
-  createdAt: string;
+export type UserRole = "operator_admin" | "operator_member" | "partner";
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  organizationId: string;
+  /** For partner users, the partner they belong to. */
+  partnerId?: string;
+  avatarColor: string;
 }
 
-export type AlertType =
-  | "competitor_price_change"
-  | "site_overpriced"
-  | "site_underpriced"
-  | "utilization_drop"
-  | "revenue_opportunity"
-  | "high_demand_window";
-
-export interface Alert {
-  id: ID;
-  siteId: ID;
-  type: AlertType;
-  severity: Severity;
-  title: string;
-  message: string;
-  /** Free-form payload, e.g. {"oldPrice":0.42,"newPrice":0.39}. */
-  data: Record<string, number | string | boolean>;
-  read: boolean;
-  createdAt: string;
+export interface Organization {
+  id: string;
+  name: string;
+  legalName: string;
+  country: string;
+  currency: "EUR" | "USD" | "GBP";
+  contactEmail: string;
 }
 
-export interface Report {
-  id: ID;
-  organizationId: ID;
-  /** First day of the reporting month, ISO date. */
-  periodStart: string;
-  periodLabel: string; // e.g. "April 2026"
-  generatedAt: string;
-  summary: ReportSummary;
-}
+export type PartnerType =
+  | "retail"
+  | "hospitality"
+  | "real_estate"
+  | "fleet"
+  | "municipality"
+  | "workplace";
 
-export interface ReportSummary {
-  avgPricePerKwh: number;
-  competitorAvgPricePerKwh: number;
-  avgUtilization: number;
-  totalRevenue: number;
-  revenueOpportunity: number;
-  recommendedActions: number;
-  topUnderperformingSites: { siteId: ID; siteName: string; utilization: number; note: string }[];
-  topPriceIncreaseOpportunities: { siteId: ID; siteName: string; suggestedDelta: number; note: string }[];
-  pricingPerformanceNote: string;
-  benchmarkNote: string;
-}
-
-// --- Demand signals -------------------------------------------------------
-
-export type WeatherCondition = "clear" | "clouds" | "rain" | "snow" | "storm";
-
-export interface DemandSignals {
-  siteId: ID;
-  asOf: string;
-  weather: { condition: WeatherCondition; tempC: number; impact: number /* -1..1 */ };
-  isHoliday: boolean;
-  holidayName?: string;
-  localEvents: { name: string; date: string; expectedExtraDemand: number /* 0..1 */ }[];
-  trafficIndex: number; // 0..1 relative to typical
-  isWeekend: boolean;
-  hourOfDay: number;
-  dayOfWeek: number; // 0=Mon
-  /** Composite multiplier the engine applies to baseline demand. ~1.0 neutral. */
-  demandMultiplier: number;
-}
-
-// --- Derived / computed view models --------------------------------------
-
-export interface BenchmarkRow {
-  siteId: ID;
-  siteName: string;
+export interface Partner {
+  id: string;
+  organizationId: string;
+  name: string;
+  type: PartnerType;
+  contactName: string;
+  contactEmail: string;
+  contactPhone?: string;
   city: string;
-  ourPrice: number;
-  competitorAvg: number | null;
-  competitorMin: number | null;
-  competitorMax: number | null;
-  competitorCount: number;
-  /** ourPrice - competitorAvg, in currency units. */
-  gapAbs: number | null;
-  /** (ourPrice - competitorAvg) / competitorAvg. */
-  gapPct: number | null;
-  utilizationRate: number;
+  region: string;
+  logoColor: string;
+  /** ISO date the partnership started. */
+  since: string;
+  /** Revenue-share percentage paid to the partner (0..1). */
+  royaltyRate: number;
+  status: "active" | "onboarding" | "churned";
+  /** ISO date of last meaningful communication with this partner. */
+  lastContactAt: string;
+  accountManagerId: string;
+}
+
+export type SiteStatus = "active" | "maintenance" | "construction" | "planned" | "offline";
+export type ElectricitySource = "grid" | "grid_green" | "solar_hybrid";
+
+export interface Charger {
+  id: string;
+  siteId: string;
+  model: string;
+  vendor: string;
+  powerKw: number;
+  connectors: number;
+  type: "AC" | "DC";
+  status: "available" | "charging" | "faulted" | "offline" | "maintenance";
+  commissionedAt: string;
+}
+
+export interface MonthlyMetric {
+  /** YYYY-MM */
+  month: string;
+  sessions: number;
+  energyKwh: number;
+  revenueEur: number;
+  uptimePct: number; // 0..1
+  avgPriceEurKwh: number;
+}
+
+export interface Site {
+  id: string;
+  organizationId: string;
+  partnerId: string;
+  name: string;
+  address: string;
+  city: string;
+  region: string;
+  country: string;
+  lat: number;
+  lng: number;
+  photoColor: string; // placeholder hero color
+  status: SiteStatus;
+  electricitySource: ElectricitySource;
+  commissionedAt: string | null;
+  expectedGoLive?: string;
+  operatorName: string; // O&M operator
+  chargerCount: number;
+  totalPowerKw: number;
+  /** Trailing monthly metrics, oldest first. */
+  monthly: MonthlyMetric[];
+  uptimePct: number; // current rolling uptime 0..1
+  sessionsPerDay: number;
+  revenuePerMonthEur: number;
+}
+
+export type IncidentStatus =
+  | "open"
+  | "in_progress"
+  | "waiting_external"
+  | "scheduled"
+  | "resolved";
+
+export type IncidentCategory =
+  | "hardware_fault"
+  | "connectivity"
+  | "vandalism"
+  | "cable_theft"
+  | "power_supply"
+  | "payment_terminal"
+  | "software"
+  | "other";
+
+export interface IncidentEvent {
+  at: string; // ISO
+  label: string;
+  by: string;
+}
+
+export interface Incident {
+  id: string;
+  organizationId: string;
+  siteId: string;
+  chargerId?: string;
+  title: string;
+  description: string;
+  category: IncidentCategory;
+  status: IncidentStatus;
+  severity: "low" | "medium" | "high";
+  openedAt: string; // ISO
+  resolvedAt?: string; // ISO
+  /** SLA target resolution time (ISO). */
+  slaDueAt: string;
+  maintenanceProviderId?: string;
+  /** ETA communicated to the partner. */
+  etaAt?: string;
+  photoColors: string[];
+  timeline: IncidentEvent[];
+}
+
+export interface MaintenanceProvider {
+  id: string;
+  organizationId: string;
+  name: string;
+  contactEmail: string;
+  phone: string;
+  regions: string[];
+  avgResolutionHours: number;
+  rating: number; // 1..5
+}
+
+export interface RoyaltyLine {
+  label: string;
+  amountEur: number; // positive = credit to partner, negative = deduction
+  kind: "gross_revenue" | "energy_cost" | "platform_fee" | "adjustment" | "royalty";
+}
+
+export interface RevenueReport {
+  id: string;
+  organizationId: string;
+  partnerId: string;
+  /** YYYY-MM */
+  month: string;
+  siteIds: string[];
+  grossRevenueEur: number;
+  energyCostEur: number;
+  platformFeeEur: number;
+  royaltyEur: number; // net payable to the partner
+  lines: RoyaltyLine[];
+  status: "draft" | "issued" | "paid";
+  issuedAt?: string;
+  paidAt?: string;
+  discrepancy?: { detected: boolean; note: string };
+}
+
+export type DeploymentStage =
+  | "site_survey"
+  | "permitting"
+  | "grid_connection"
+  | "civil_works"
+  | "equipment_delivery"
+  | "installation"
+  | "commissioning"
+  | "go_live";
+
+export interface DeploymentMilestone {
+  stage: DeploymentStage;
+  label: string;
+  status: "done" | "in_progress" | "blocked" | "pending";
+  plannedAt: string;
+  completedAt?: string;
+  note?: string;
+}
+
+export interface Deployment {
+  id: string;
+  organizationId: string;
+  partnerId: string;
+  siteId: string;
+  name: string;
+  city: string;
+  region: string;
+  progress: number; // 0..1
+  expectedGoLive: string; // ISO
+  delayed: boolean;
+  delayReason?: string;
+  plannedChargers: number;
+  plannedPowerKw: number;
+  milestones: DeploymentMilestone[];
+  documentIds: string[];
+}
+
+export type CompetitorBrand =
+  | "Tesla Supercharger"
+  | "Ionity"
+  | "Fastned"
+  | "TotalEnergies"
+  | "Electra"
+  | "Allego"
+  | "Power Dot"
+  | "Engie Vianeo";
+
+export interface CompetitorPoint {
+  brand: CompetitorBrand;
+  distanceKm: number;
+  maxPowerKw: number;
+  priceEurKwh: number;
+  estimatedUtilizationPct: number; // 0..1
+}
+
+export interface SiteBenchmark {
+  siteId: string;
+  ourPriceEurKwh: number;
+  ourMaxPowerKw: number;
+  ourUtilizationPct: number;
+  competitors: CompetitorPoint[];
+  marketSharePct: number; // 0..1
   position: "underpriced" | "aligned" | "overpriced" | "unknown";
 }
 
-export interface KpiSummary {
-  avgPricePerKwh: number;
-  currency: Currency;
-  /** Weighted competitor gap across the portfolio, as a fraction. */
-  competitorGapPct: number;
-  /** Estimated additional monthly revenue if all open recommendations are applied. */
-  revenueOpportunity: number;
-  /** Portfolio-weighted utilization, 0..1. */
-  utilizationRate: number;
-  recommendedActions: number;
-  openAlerts: number;
-  siteCount: number;
+export type CampaignType =
+  | "promo_code"
+  | "session_discount"
+  | "onboarding"
+  | "reopening"
+  | "retailer"
+  | "fleet";
+
+export interface Campaign {
+  id: string;
+  organizationId: string;
+  partnerId: string;
+  name: string;
+  type: CampaignType;
+  status: "draft" | "scheduled" | "active" | "completed";
+  startsAt: string;
+  endsAt: string;
+  siteIds: string[];
+  promoCode?: string;
+  discountPct?: number;
+  sessionsGenerated: number;
+  promoRedemptions: number;
+  estimatedUpliftPct: number; // vs baseline
+  budgetEur: number;
+}
+
+export type DocumentKind =
+  | "contract"
+  | "amendment"
+  | "invoice"
+  | "report"
+  | "permit"
+  | "technical"
+  | "signed_pdf"
+  | "other";
+
+export interface DocumentItem {
+  id: string;
+  organizationId: string;
+  partnerId?: string;
+  siteId?: string;
+  name: string;
+  kind: DocumentKind;
+  sizeKb: number;
+  uploadedAt: string;
+  uploadedBy: string;
+  url: string;
+}
+
+export interface Contract {
+  id: string;
+  organizationId: string;
+  partnerId: string;
+  title: string;
+  type: "framework" | "site_specific" | "amendment";
+  status: "active" | "expired" | "pending_signature";
+  startsAt: string;
+  endsAt: string;
+  royaltyRate: number;
+  documentId: string;
+  signedBy?: string;
+}
+
+export type NotificationType =
+  | "uptime_drop"
+  | "charger_offline"
+  | "revenue_decline"
+  | "missing_invoice"
+  | "deployment_delay"
+  | "unresolved_incident"
+  | "utilization_opportunity"
+  | "partner_inactivity"
+  | "discrepancy";
+
+export interface Notification {
+  id: string;
+  organizationId: string;
+  type: NotificationType;
+  severity: Severity;
+  title: string;
+  body: string;
+  createdAt: string;
+  read: boolean;
+  partnerId?: string;
+  siteId?: string;
+  href?: string;
+}
+
+export type AiSummaryScope = "site" | "partner" | "incident" | "monthly_report" | "deployment";
+
+export interface AiSummary {
+  id: string;
+  organizationId: string;
+  scope: AiSummaryScope;
+  refId: string;
+  headline: string;
+  body: string;
+  bullets: string[];
+  actions: string[];
+  generatedAt: string;
+  model: string;
 }

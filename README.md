@@ -1,177 +1,138 @@
-# VoltYield — Revenue Management for EV Charging
+# PartnerOS — by Watty
 
-Dynamic pricing & revenue management for EV charging operators. VoltYield helps
-operators monitor competitor prices around each site, benchmark local pricing,
-detect over/under-priced sites, visualize utilization and revenue opportunity,
-and generate AI-assisted pricing recommendations — with a path to automated
-price changes via roaming/CPO APIs.
+**The Partner Success Platform for EV charging networks.**
 
-> Think hotel / airline yield management, applied to EV charging networks.
+PartnerOS is the "Stripe Dashboard" / "Airbnb Host Dashboard" for EV charging
+partnerships. It gives Charge Point Operators (CPOs) — and their retail, hotel,
+real-estate, fleet and municipal partners — one calm, transparent place to see
+**site performance, incidents, revenue & royalties, deployments, campaigns,
+documents and AI-generated summaries**.
 
-This repository is an **MVP**: a working Next.js app backed by a realistic mock
-dataset and a deterministic, rule-based recommendation engine. The data layer is
-deliberately abstracted so real data sources (OpenChargeMap, Google Places,
-roaming APIs, CSV import, Postgres) can replace the mocks with minimal changes.
+> Core product philosophy: **a partner should understand everything in under 10 seconds.**
 
----
-
-## Quick start
-
-```bash
-# Node 18.18+ recommended
-npm install
-cp .env.example .env        # optional — app runs fine with defaults (DATA_SOURCE=mock)
-npm run dev                  # http://localhost:3000  → redirects to /dashboard
-```
-
-Other scripts:
-
-```bash
-npm run build        # production build
-npm run start        # run the production build
-npm run typecheck    # tsc --noEmit
-npm run lint         # next lint
-```
-
-No database, API keys, or external services are required to run the MVP.
+This repository contains the **MVP** — a Next.js app with a realistic French
+demo dataset, a clean B2B SaaS UI, a deterministic AI assistant layer, a REST
+API and a Prisma schema for going live. It is built like a real seed-stage
+startup product.
 
 ---
 
-## What's in the box
+## What's inside
 
-### Pages
-| Route | Purpose |
+| Module | Where |
 | --- | --- |
-| `/dashboard` | KPI cards, site map, pricing benchmark table, top AI recommendation, alerts panel |
-| `/sites` | Portfolio map + table of all charging sites with key metrics |
-| `/sites/[id]` | Site detail: stats, competitor map, hourly/weekday utilization charts, demand signals, competitor benchmark, recommendations, alerts |
-| `/competitors` | Competitor benchmarking across the portfolio + full competitor station list |
-| `/recommendations` | All engine recommendations with status filters; accept / dismiss / export each |
-| `/alerts` | Alert feed (competitor moves, over/under pricing, utilization drops, opportunities, demand windows) |
-| `/reports` | Monthly pricing & revenue report (printable, JSON export) |
-| `/settings` | Organization, pricing-strategy knobs, team, data-source/integration status |
+| 1. Partner Dashboard — revenue, sessions, uptime, chargers, royalties, incidents, works, activity, AI site summary | `/dashboard` |
+| 2. Site Management — photos, address, coordinates, charger models, power, status, uptime, commissioning, operator, electricity type, maintenance history, utilization, sessions/day, revenue/month | `/sites`, `/sites/[id]` |
+| 3. Incident & Maintenance Tracking — creation, statuses, contractor assignment, cable-theft tracking, SLA, repair history, ETA, timeline, photos | `/incidents`, `/incidents/[id]` |
+| 4. Revenue & Royalties — monthly revenue, royalty calculation, electricity costs, invoices, downloadable reports, payment history, next-payout estimate, discrepancy alerts, **visual explainer** | `/revenues` |
+| 5. Deployment & Works Tracking — permits, grid connection, civil works, equipment delivery, commissioning, delays, milestones, expected go-live, progress timeline, documents | `/deployments`, `/deployments/[id]` |
+| 6. Competitor Benchmark — nearby competitors, price comparison, power comparison, utilization benchmark, market positioning, local market-share estimate | inside `/sites/[id]` |
+| 7. Marketing Campaigns — promo codes, charging discounts, onboarding / reopening / retailer / fleet campaigns, sessions generated, promo usage, uplift estimation | `/campaigns` |
+| 8. AI Partner Assistant — summarises sites/partners/incidents/reports/deployments, explains revenue changes, drafts partner emails, suggests actions | `src/lib/ai.ts`, surfaced across the app |
+| 9. Alerts Center — uptime drops, charger offline, revenue decline, missing invoice, deployment delay, unresolved ticket, utilization opportunity, partner inactivity, discrepancies | `/alerts` |
+| 10. Documents & Contracts — contracts, amendments, invoices, reports, permits, technical docs, signed PDFs | `/documents` |
+| Reports | `/reports` |
+| Settings — workspace, team, royalty defaults, maintenance providers, AI config, integrations | `/settings` |
 
-### API routes (`/api/*`)
-| Method & path | Description |
-| --- | --- |
-| `GET /api/me` | Current user + organization |
-| `GET /api/kpis` | Portfolio KPI summary |
-| `GET /api/sites` | List sites |
-| `GET /api/sites/:id` | Site detail bundle (competitors, benchmark, utilization, demand, recommendations, alerts) |
-| `GET /api/competitors?siteId=` | Competitor stations (optionally filtered by site) |
-| `GET /api/benchmarks` | Per-site pricing benchmark rows |
-| `GET /api/recommendations?siteId=&status=` | Recommendations |
-| `PATCH /api/recommendations/:id` | Update status — body `{ "status": "accepted" \| "dismissed" \| "exported" \| "open" }` |
-| `GET /api/alerts?siteId=&unreadOnly=` | Alerts |
-| `POST /api/alerts` | Mark all alerts read |
-| `PATCH /api/alerts/:id` | Mark one alert read |
-| `GET /api/reports` / `GET /api/reports/:id` | Monthly reports |
-| `GET /api/demand-signals/:siteId` | Demand signals for a site |
-
-### Core libraries (`src/lib/`)
-- **`types.ts`** — domain types shared by the data layer, API and UI (mirror the Prisma schema).
-- **`mock-data.ts`** — hand-authored, realistic mock dataset (org, users, 6 sites, chargers, 15 competitors, utilization curves, price observations, demand signals).
-- **`recommendation-engine.ts`** — pure, deterministic rule engine: benchmarks, recommendations, alerts, KPI rollups, monthly report builder, and an `explainRecommendation()` LLM seam.
-- **`demand-signals.ts`** — demand-signal layer with the live-integration seam (weather / holidays / events / traffic) and a composite demand multiplier.
-- **`data.ts`** — the single data-access module the app imports; composes mock data + engine and holds interactive demo state (recommendation status, alert read-state).
-- **`utils.ts`** — formatting, haversine distance, small helpers.
-
----
-
-## The recommendation engine
-
-All numbers are computed **deterministically** by the engine — never by an LLM.
-An optional LLM step (`explainRecommendation`) only *rephrases* the rule-based
-rationale; it cannot change figures. Implemented rules:
-
-1. **Lower price** — our price > 10% above the local competitor average **and**
-   utilization is below the low threshold → suggest a reduction toward `local avg × (1 + targetGapAbove)`.
-2. **Raise price** — our price > 5% below the local average **and** utilization
-   is above the high threshold → suggest an increase that sits just under the local average.
-3. **Happy hour** — utilization is well below the daily average in a contiguous
-   off-peak band → suggest a time-boxed discount in that window.
-4. **Hold / nudge up** — ≥ 50% of nearby competitors are at/near capacity and we
-   aren't under-utilized → hold price, or nudge up if there's headroom.
-5. **Demand-spike uplift** — composite demand signal (weather, holiday, local
-   events, traffic, weekend) ≥ +15% over baseline → temporary uplift, then revert.
-6. **7-day promo test** — high competitor gap **and** declining weekday
-   utilization → run a short promotional price to de-risk a permanent change.
-
-Impact estimates use a constant-elasticity proxy over the site's current
-price/sessions/revenue, with two regimes: an *own-price* elasticity (≈ −0.4)
-when the site is at/under market and demand is sticky, and a *competitive*
-elasticity (≈ −1.3) when the site is well above market and under-utilized (so a
-price cut is revenue-accretive because drivers are substituting to competitors).
-Engine knobs live on the organization
-(`targetGapAbove`, `lowUtilizationThreshold`, `highUtilizationThreshold`,
-`minPriceStep`, `autoApply`) and are surfaced read-only on `/settings`.
-
-Example outputs (generated from the mock data):
-- *"Your price (€0.49/kWh) is 17% above the local competitor average (€0.41/kWh) while utilization is only 31%. Lower price by €0.06/kWh…"*
-- *"Your site is 9% cheaper than local competitors (€0.61/kWh) while utilization is 78%. Increase price by €0.05/kWh…"*
-- *"Competitor gap is high and utilization is trending down. Test €0.03/kWh lower for 7 days…"*
-
----
-
-## Database
-
-The target schema is in [`prisma/schema.prisma`](prisma/schema.prisma):
-`Organization`, `User`, `Site`, `Charger`, `Competitor`, `PriceObservation`,
-`UtilizationData`, `Recommendation`, `Alert`, `Report`.
-
-The MVP does **not** require Postgres — it uses the in-memory mock layer. To wire
-up the database later:
-
-```bash
-# set DATABASE_URL in .env, then:
-npm run prisma:generate
-npm run prisma:migrate     # creates tables
-npm run seed               # loads the mock dataset into Postgres
-# then re-implement the bodies of src/lib/data.ts using PrismaClient
-```
-
----
-
-## Switching from mock to live data
-
-`DATA_SOURCE=mock` (default) keeps everything offline. The seams for live data:
-
-- **`src/lib/data.ts`** — the contract every page/route uses. Swap function
-  bodies for Prisma queries / provider calls; keep the signatures.
-- **`src/lib/demand-signals.ts`** — `getDemandSignals(site)` has a commented
-  live branch for weather/holiday/event/traffic providers.
-- **`src/lib/recommendation-engine.ts`** — `explainRecommendation()` has a
-  commented Anthropic call to rephrase rationales.
-
-Candidate providers (configure via `.env`): OpenChargeMap, Google Maps Places,
-Chargeprice, public roaming/CPO APIs, OpenWeather, manual CSV import, and
-(where legally allowed) scraped public pricing pages.
-
-See [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) for the integration roadmap.
+Other pages: `/partners`, `/partners/[id]`.
 
 ---
 
 ## Tech stack
 
-- **Next.js 14** (App Router) · **React 18** · **TypeScript**
-- **Tailwind CSS** (custom B2B theme: royal dark blue `#0B1F4D`, secondary `#1E4ED8`, canvas `#F8FAFC`)
-- **Recharts** for charts; a dependency-free schematic map (`src/components/SiteMap.tsx`) — swap for Mapbox/Leaflet when `NEXT_PUBLIC_MAPBOX_TOKEN` is set
-- **Prisma** schema for the target Postgres model (not required for the MVP)
+- **Frontend:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Recharts. Clean inline SVG icon set; no heavyweight UI kit. (Mapbox slot wired via `NEXT_PUBLIC_MAPBOX_TOKEN`; site detail pages render schematic placeholders without it.)
+- **Backend:** Next.js Route Handlers expose a small REST API (`/api/*`). The shape is identical whether data comes from the in-memory demo or Postgres.
+- **Data layer:** `src/lib/data.ts` is the single seam — in the MVP it composes the static demo dataset (`src/lib/mock-data.ts`) and derives KPIs, alerts and AI summaries. Swap the function bodies for Prisma queries to go live.
+- **Database (target):** PostgreSQL via Prisma — full schema in [`prisma/schema.prisma`](prisma/schema.prisma) covering Organizations, Users, Partners, Sites, Chargers, SiteMonthlyMetrics, Incidents, IncidentEvents, MaintenanceProviders, RevenueReports, RoyaltyLines, Deployments, DeploymentMilestones, SiteBenchmark, CompetitorPoint, Campaigns, Documents, Contracts, Notifications, AiSummaries.
+- **AI layer:** OpenAI / Claude API. Used **only** for summaries, explanations, recommendations and communication drafting — **never** for deterministic calculations. The MVP ships a deterministic template engine in `src/lib/ai.ts` that mirrors the production prompt contract, so the app is fully functional offline and the swap to a real model is a single function body.
 
 ---
 
-## Docs
+## Getting started
 
-- [`docs/PRD.md`](docs/PRD.md) — product requirements
-- [`docs/WIREFRAMES.md`](docs/WIREFRAMES.md) — UX wireframe structure
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture & data flow
-- [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) — real-data integration roadmap
+```bash
+npm install
+cp .env.example .env       # mock mode works with no keys
+npm run dev                # http://localhost:3000  → redirects to /dashboard
+```
+
+Useful scripts:
+
+```bash
+npm run build       # production build
+npm run typecheck   # tsc --noEmit
+npm run lint        # next lint
+```
+
+### Going live with a database (optional)
+
+```bash
+# 1. point DATABASE_URL at Postgres in .env  (see .env.example)
+npm run prisma:generate
+npm run prisma:migrate      # creates the schema
+npm run seed                # loads the demo dataset via Prisma
+```
+
+Then replace the bodies of the functions in `src/lib/data.ts` with Prisma
+queries — the API routes and pages don't change.
+
+### Plugging in a real AI model
+
+Set `ANTHROPIC_API_KEY` (and `AI_MODEL=claude-sonnet-4-6`) or `OPENAI_API_KEY`,
+then replace the template bodies in `src/lib/ai.ts` with a model call. Feed the
+model the **already-computed** metrics from `src/lib/data.ts` and ask only for
+prose / drafts. Keep `AI_MODEL_ID` updated so it shows on the AI summary cards.
 
 ---
 
-## Notes & limitations (MVP)
+## Demo data
 
-- Auth is stubbed: a single demo user/organization is returned by `getCurrentUser()`/`getOrganization()`. Wire up NextAuth/Clerk before any real use.
-- Recommendation status and alert read-state are kept in process memory — they reset on server restart. Persist via the database for production.
-- The map is schematic (no basemap tiles) to keep the MVP dependency-light.
-- Impact estimates are directional, not forecasts. Treat recommendations as decision support, not autopilot (`autoApply` is disabled).
+Hand-authored, realistic data for a mid-size French CPO ("Watty"):
+
+- **6 partners** — Carrefour Bretagne (retail), Hôtels Océane Ouest (hospitality), Foncière Atlantique (real estate), Greenfleet Logistics (fleet), Ville de Saint-Malo (municipality), Decathlon Sud-Ouest (retail, onboarding).
+- **12 sites** across Bretagne, Pays de la Loire, Nouvelle-Aquitaine, Auvergne-Rhône-Alpes and Occitanie — including active HPC hubs, hospitality AC sites, a site in maintenance after a cable theft, and two in deployment.
+- **Chargers** from ABB, Alpitronic and Schneider; trailing monthly metric series (sessions, energy, revenue, uptime, price) generated from compact seeds.
+- **8 incidents** spanning power-module faults, cable theft, connectivity, payment terminals and scheduled firmware — with full timelines and SLA/ETA tracking.
+- **Revenue reports** for the last three months per partner, with a flagged discrepancy and a service credit.
+- **4 deployments** with milestone timelines (one delayed by an Enedis grid-connection slot), **6 campaigns**, **16 documents**, **7 contracts**, **10 alerts**.
+
+All financial figures are computed deterministically; the AI layer only narrates.
+
+---
+
+## Documentation
+
+- [`docs/PRD.md`](docs/PRD.md) — Product Requirements Document
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — UX architecture, user flows, data & API architecture, AI assistant logic
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — deployment instructions (Vercel / Docker / GCP-AWS) and the database cutover
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — phased MVP → seed plan
+
+---
+
+## Project structure
+
+```
+src/
+  app/
+    layout.tsx, page.tsx, not-found.tsx, globals.css
+    dashboard/  partners/  sites/  incidents/  deployments/
+    revenues/   campaigns/  documents/  reports/  alerts/  settings/
+    api/        # REST route handlers
+  components/
+    ui.tsx, Icons.tsx, StatusBadge.tsx, Charts.tsx (client),
+    AiSummaryCard.tsx, AlertsList.tsx, ActivityFeed.tsx, Timeline.tsx
+    layout/     # Sidebar (client), Topbar, Logo
+  lib/
+    types.ts        # domain types (mirror the Prisma schema)
+    mock-data.ts     # the demo dataset
+    data.ts          # data access layer — the swap-to-Postgres seam
+    ai.ts            # AI Partner Assistant logic (deterministic templates)
+    utils.ts         # formatting & math helpers
+prisma/
+  schema.prisma, seed.ts
+```
+
+---
+
+Built by Watty. Calm, modern, trustworthy, enterprise-ready — and simple enough
+for a shop manager or property owner to understand at a glance.

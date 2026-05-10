@@ -1,17 +1,13 @@
-import { NextResponse } from "next/server";
-import { getAlerts, markAllAlertsRead } from "@/lib/data";
+import { getNotifications } from "@/lib/data";
+import { ok } from "../_helpers";
 
-export const dynamic = "force-dynamic";
-
-export async function GET(req: Request) {
+export function GET(req: Request) {
   const url = new URL(req.url);
-  const siteId = url.searchParams.get("siteId") ?? undefined;
-  const unreadOnly = url.searchParams.get("unreadOnly") === "true";
-  return NextResponse.json(await getAlerts({ siteId, unreadOnly }));
-}
-
-// Mark all alerts read.
-export async function POST() {
-  const n = await markAllAlertsRead();
-  return NextResponse.json({ markedRead: n });
+  return ok(
+    getNotifications({
+      unreadOnly: url.searchParams.get("unreadOnly") === "true",
+      partnerId: url.searchParams.get("partnerId") ?? undefined,
+      severity: (url.searchParams.get("severity") as never) ?? undefined,
+    }),
+  );
 }

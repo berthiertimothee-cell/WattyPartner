@@ -1,119 +1,115 @@
 import Link from "next/link";
-import { getOrganization, getReports } from "@/lib/data";
-import { Card, CardHeader, PageHeader, Stat } from "@/components/ui";
-import { ReportActions } from "@/components/ReportActions";
-import { formatDelta, formatMoney, formatPercent, formatPrice, formatSignedPercent } from "@/lib/utils";
+import { getDocuments, getPartner, getPartnerMetrics, getPartners, getRevenueReports, getReportSummary } from "@/lib/data";
+import { PageHeader, Card, CardHeader, KpiTile, ActionButton } from "@/components/ui";
+import { AiSummaryCard } from "@/components/AiSummaryCard";
+import { ReportStatusBadge } from "@/components/StatusBadge";
+import { ChartIcon, DownloadIcon, MailIcon } from "@/components/Icons";
+import { formatDate, formatMoney, formatMonth, formatPercent } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
-
-export default async function ReportsPage({ searchParams }: { searchParams: { id?: string } }) {
-  const [org, reports] = await Promise.all([getOrganization(), getReports()]);
-  const active = (searchParams.id && reports.find((r) => r.id === searchParams.id)) || reports[0];
-  const s = active.summary;
-  const gapPct = s.competitorAvgPricePerKwh ? (s.avgPricePerKwh - s.competitorAvgPricePerKwh) / s.competitorAvgPricePerKwh : 0;
+export default function ReportsPage() {
+  const partners = getPartners();
+  const reportDocs = getDocuments({ kind: "report" });
+  const allReports = getRevenueReports();
+  const months = [...new Set(allReports.map((r) => r.month))].sort().reverse();
+  const latestMonth = months[0];
+  // Preview: AI-generated monthly report for the latest statement of the first partner with one.
+  const previewReport = allReports.find((r) => r.month === latestMonth) ?? allReports[0];
+  const previewSummary = previewReport ? getReportSummary(previewReport.id) : undefined;
+  const previewPartner = previewReport ? getPartner(previewReport.partnerId) : undefined;
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
         title="Reports"
-        subtitle="Monthly pricing performance & revenue opportunity"
-        actions={<ReportActions report={active} />}
+        subtitle="Generate monthly partner reports — performance, uptime, incidents, revenue and royalties — and share or download them as PDF."
+        actions={<ActionButton variant="primary"><ChartIcon className="h-4 w-4" /> Generate {latestMonth ? formatMonth(latestMonth) : "monthly"} reports</ActionButton>}
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {reports.map((r) => {
-          const isActive = r.id === active.id;
-          return (
-            <Link key={r.id} href={`/reports?id=${r.id}`} className={"badge px-3 py-1.5 text-sm " + (isActive ? "bg-brand text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50")}>
-              {r.periodLabel}
-            </Link>
-          );
-        })}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <KpiTile label="Report period" value={latestMonth ? formatMonth(latestMonth) : "—"} icon={<ChartIcon className="h-5 w-5" />} sub="Latest closed month" />
+        <KpiTile label="Generated reports" value={`${reportDocs.length}`} icon={<DownloadIcon className="h-5 w-5" />} sub="Available to download" />
+        <KpiTile label="Partners" value={`${partners.length}`} icon={<ChartIcon className="h-5 w-5" />} sub="Eligible for monthly reports" />
+        <KpiTile label="Statements issued" value={`${allReports.filter((r) => r.month === latestMonth).length}`} icon={<ChartIcon className="h-5 w-5" />} sub={`for ${latestMonth ? formatMonth(latestMonth) : "—"}`} />
       </div>
 
-      <Card className="card-pad">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">{org.name} — Pricing & Revenue Report</h2>
-            <p className="text-sm text-muted">Period: {active.periodLabel} · Generated {new Date(active.generatedAt).toLocaleDateString()}</p>
-          </div>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Avg price / kWh" value={formatPrice(s.avgPricePerKwh, org.currency)} />
-          <Stat label="Competitor avg" value={formatPrice(s.competitorAvgPricePerKwh, org.currency)} sub={formatSignedPercent(gapPct) + " gap"} />
-          <Stat label="Avg utilization" value={formatPercent(s.avgUtilization)} />
-          <Stat label="Total revenue / mo" value={formatMoney(s.totalRevenue, org.currency)} />
-          <Stat label="Revenue opportunity" value={formatMoney(s.revenueOpportunity, org.currency)} tone="success" />
-          <Stat label="Recommended actions" value={s.recommendedActions} tone="warning" />
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Pricing performance" />
-          <div className="card-pad space-y-2 text-sm text-slate-600">
-            <p>{s.pricingPerformanceNote}</p>
-            <p>{s.benchmarkNote}</p>
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title="Benchmark vs. competitors" />
-          <div className="card-pad text-sm text-slate-600">
-            <p>
-              Portfolio average is {formatPrice(s.avgPricePerKwh, org.currency)} vs. a local competitor average of {formatPrice(s.competitorAvgPricePerKwh, org.currency)} — a gap of {formatSignedPercent(gapPct)}.
-            </p>
-            <p className="mt-2">{s.revenueOpportunity > 0 ? `Acting on the open recommendations is estimated to add ${formatMoney(s.revenueOpportunity, org.currency)} per month.` : "No material revenue opportunity is currently flagged."}</p>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Top underperforming sites" subtitle="Lowest utilization" />
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr><th className="px-5 py-3">Site</th><th className="px-5 py-3">Utilization</th><th className="px-5 py-3">Note</th></tr></thead>
-              <tbody>
-                {s.topUnderperformingSites.map((u) => (
-                  <tr key={u.siteId} className="table-row">
-                    <td className="px-5 py-3"><Link href={`/sites/${u.siteId}`} className="font-medium text-ink hover:text-brand-600">{u.siteName}</Link></td>
-                    <td className="px-5 py-3 tabular-nums">{formatPercent(u.utilization)}</td>
-                    <td className="px-5 py-3 text-muted">{u.note}</td>
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader title="Monthly partner reports" subtitle={`One row per partner — ${latestMonth ? formatMonth(latestMonth) : "current"} period`} icon={<ChartIcon className="h-5 w-5" />} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="px-5 py-2.5 sm:px-6">Partner</th>
+                    <th className="px-3 py-2.5">Sites</th>
+                    <th className="px-3 py-2.5 text-right">Revenue / mo</th>
+                    <th className="px-3 py-2.5 text-right">Avg uptime</th>
+                    <th className="px-3 py-2.5 text-right">Royalty</th>
+                    <th className="px-5 py-2.5 text-right sm:px-6">Report</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title="Top price-increase opportunities" subtitle="Highest estimated monthly upside" />
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr><th className="px-5 py-3">Site</th><th className="px-5 py-3">Suggested change</th><th className="px-5 py-3">Note</th></tr></thead>
-              <tbody>
-                {s.topPriceIncreaseOpportunities.length === 0 ? (
-                  <tr><td colSpan={3} className="px-5 py-6 text-center text-sm text-muted">No price-increase opportunities this period.</td></tr>
-                ) : (
-                  s.topPriceIncreaseOpportunities.map((o) => (
-                    <tr key={o.siteId} className="table-row">
-                      <td className="px-5 py-3"><Link href={`/sites/${o.siteId}`} className="font-medium text-ink hover:text-brand-600">{o.siteName}</Link></td>
-                      <td className="px-5 py-3 tabular-nums">{formatDelta(o.suggestedDelta, org.currency, 2)}/kWh</td>
-                      <td className="px-5 py-3 text-muted">{o.note}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
+                </thead>
+                <tbody>
+                  {partners.map((p) => {
+                    const pm = getPartnerMetrics(p.id);
+                    const r = allReports.find((x) => x.partnerId === p.id && x.month === latestMonth) ?? getRevenueReports({ partnerId: p.id })[0];
+                    const hasDoc = reportDocs.some((d) => d.partnerId === p.id);
+                    return (
+                      <tr key={p.id} className="table-row">
+                        <td className="px-5 py-3 sm:px-6"><Link href={`/partners/${p.id}`} className="font-medium text-ink hover:text-brand-600">{p.name}</Link></td>
+                        <td className="px-3 py-3 text-slate-600">{pm.liveSitesCount}/{pm.sitesCount}</td>
+                        <td className="px-3 py-3 text-right tabular-nums text-slate-600">{formatMoney(pm.revenueThisMonth)}</td>
+                        <td className="px-3 py-3 text-right tabular-nums text-slate-600">{pm.avgUptime != null ? formatPercent(pm.avgUptime, 1) : "—"}</td>
+                        <td className="px-3 py-3 text-right tabular-nums font-medium text-ink">{r ? formatMoney(r.royaltyEur) : "—"}</td>
+                        <td className="px-5 py-3 text-right sm:px-6">
+                          <span className="inline-flex items-center gap-2">
+                            {r && <ReportStatusBadge status={r.status} />}
+                            <span className="btn-ghost cursor-default !px-2 !py-1 text-brand-600" title={hasDoc ? "Download report" : "Generate report"}><DownloadIcon className="h-4 w-4" /></span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
 
-      <Card>
-        <CardHeader title="Recommended actions summary" />
-        <div className="card-pad text-sm text-slate-600">
-          <p>{s.recommendedActions} open recommendations across the portfolio. Review the full list and accept, dismiss or export each one from the <Link href="/recommendations" className="font-medium text-brand-600 hover:underline">Recommendations</Link> page.</p>
+          <Card>
+            <CardHeader title="Recently generated" subtitle="Downloadable PDFs" icon={<DownloadIcon className="h-5 w-5" />} />
+            <ul className="divide-y divide-slate-100">
+              {reportDocs.map((d) => (
+                <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3 sm:px-6">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">{d.name}</p>
+                    <p className="text-[11px] text-muted">{Math.round(d.sizeKb)} KB · generated {formatDate(d.uploadedAt)} by {d.uploadedBy}</p>
+                  </div>
+                  <span className="btn-secondary cursor-default !py-1.5"><DownloadIcon className="h-4 w-4" /> PDF</span>
+                </li>
+              ))}
+              {reportDocs.length === 0 && <li className="px-6 py-6 text-center text-sm text-muted">No reports generated yet.</li>}
+            </ul>
+          </Card>
         </div>
-      </Card>
+
+        <div className="space-y-6">
+          {previewSummary && (
+            <>
+              <div className="rounded-2xl border border-slate-200 bg-white p-1 shadow-card">
+                <div className="rounded-xl bg-gradient-to-br from-brand to-brand-600 px-5 py-4 text-white">
+                  <p className="text-xs font-medium uppercase tracking-wide text-white/70">Monthly partner report — preview</p>
+                  <p className="mt-1 text-lg font-semibold">{previewPartner?.name}</p>
+                  <p className="text-sm text-white/80">{previewReport ? formatMonth(previewReport.month) : ""} · prepared by Watty PartnerOS</p>
+                </div>
+              </div>
+              <AiSummaryCard summary={previewSummary} />
+              <div className="flex gap-2">
+                <span className="btn-secondary flex-1 cursor-default justify-center"><MailIcon className="h-4 w-4" /> Send to partner</span>
+                <span className="btn-primary flex-1 cursor-default justify-center"><DownloadIcon className="h-4 w-4" /> Download PDF</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

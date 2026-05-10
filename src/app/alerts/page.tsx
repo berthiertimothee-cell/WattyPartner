@@ -1,32 +1,48 @@
-import { getAlerts, getSites } from "@/lib/data";
-import { Card, CardHeader, PageHeader, Stat } from "@/components/ui";
-import { AlertsPanel } from "@/components/AlertsPanel";
+import { getNotifications, getPartners } from "@/lib/data";
+import { PageHeader, Card, CardHeader, KpiTile } from "@/components/ui";
+import { AlertsList } from "@/components/AlertsList";
+import { AlertTriangleIcon, BellIcon, ChartIcon } from "@/components/Icons";
+import { titleCase } from "@/lib/utils";
+import type { Severity } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+const SEVERITY_TITLE: Record<Severity, string> = { critical: "Critical", warning: "Needs attention", opportunity: "Opportunities", info: "For your information" };
+const SEVERITY_ORDER: Severity[] = ["critical", "warning", "opportunity", "info"];
 
-export default async function AlertsPage() {
-  const [alerts, sites] = await Promise.all([getAlerts(), getSites()]);
-  const siteNames = Object.fromEntries(sites.map((s) => [s.id, s.name]));
-  const unread = alerts.filter((a) => !a.read).length;
-  const byType = (t: string) => alerts.filter((a) => a.type === t).length;
+export default function AlertsPage() {
+  const all = getNotifications();
+  const partnerNameById = new Map(getPartners().map((p) => [p.id, p.name]));
+  const bySeverity = new Map<Severity, typeof all>();
+  for (const s of SEVERITY_ORDER) bySeverity.set(s, all.filter((n) => n.severity === s));
+  const unread = all.filter((n) => !n.read).length;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Alerts" subtitle="Pricing, competitor and demand alerts across your portfolio" />
+    <div>
+      <PageHeader
+        title="Alerts Center"
+        subtitle="Automatically generated alerts — uptime drops, offline chargers, revenue declines, missing invoices, deployment delays, unresolved incidents, utilization opportunities and partner inactivity."
+      />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card className="card-pad"><Stat label="Total alerts" value={alerts.length} sub={`${unread} unread`} /></Card>
-        <Card className="card-pad"><Stat label="Pricing alerts" value={byType("site_overpriced") + byType("site_underpriced")} sub="over / under priced" /></Card>
-        <Card className="card-pad"><Stat label="Competitor moves" value={byType("competitor_price_change")} sub="price changes detected" /></Card>
-        <Card className="card-pad"><Stat label="Opportunities" value={byType("revenue_opportunity") + byType("high_demand_window")} sub="revenue / demand" tone="success" /></Card>
+        <KpiTile label="Open alerts" value={`${all.length}`} icon={<BellIcon className="h-5 w-5" />} sub={`${unread} unread`} />
+        <KpiTile label="Critical" value={`${bySeverity.get("critical")?.length ?? 0}`} icon={<AlertTriangleIcon className="h-5 w-5" />} sub="Require action now" />
+        <KpiTile label="Needs attention" value={`${bySeverity.get("warning")?.length ?? 0}`} icon={<AlertTriangleIcon className="h-5 w-5" />} />
+        <KpiTile label="Opportunities" value={`${bySeverity.get("opportunity")?.length ?? 0}`} icon={<ChartIcon className="h-5 w-5" />} sub="Growth & utilization" />
       </div>
 
-      <Card>
-        <CardHeader title="Alert feed" subtitle="Newest first" />
-        <div className="card-pad">
-          <AlertsPanel alerts={alerts} siteNames={siteNames} />
-        </div>
-      </Card>
+      <div className="mt-6 space-y-6">
+        {SEVERITY_ORDER.map((s) => {
+          const list = bySeverity.get(s)!;
+          if (!list.length) return null;
+          return (
+            <Card key={s}>
+              <CardHeader title={SEVERITY_TITLE[s]} subtitle={`${list.length} alert${list.length === 1 ? "" : "s"}`} icon={<BellIcon className="h-5 w-5" />} />
+              <div className="p-2">
+                <AlertsList items={list} partnerNameById={partnerNameById} />
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

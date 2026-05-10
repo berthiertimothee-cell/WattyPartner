@@ -1,180 +1,268 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSiteDetail, getOrganization } from "@/lib/data";
-import { Card, CardHeader, GapPill, PageHeader, PositionBadge, SeverityBadge, Stat, StatusBadge, EmptyState } from "@/components/ui";
-import { SiteMap } from "@/components/SiteMap";
-import { UtilizationChart, WeekdayBars, PriceComparisonChart } from "@/components/charts";
-import { RecommendationCard } from "@/components/RecommendationCard";
-import { AlertsPanel } from "@/components/AlertsPanel";
-import { formatMoney, formatPercent, formatPrice, relativeDate } from "@/lib/utils";
+import {
+  getBenchmark,
+  getChargersBySite,
+  getDeploymentForSite,
+  getDocuments,
+  getIncidents,
+  getPartner,
+  getSite,
+  getSiteSummary,
+} from "@/lib/data";
+import { PageHeader, Card, CardHeader, KpiTile, ActionButton, PhotoPlaceholder, KeyValue, ProgressBar } from "@/components/ui";
+import { AreaTrendChart, BarSeriesChart, HBarCompareChart, LineTrendChart } from "@/components/Charts";
+import { AiSummaryCard } from "@/components/AiSummaryCard";
+import { ChargerStatusBadge, IncidentStatusBadge, PositionBadge, SiteStatusBadge } from "@/components/StatusBadge";
+import { Timeline } from "@/components/Timeline";
+import { BoltIcon, ChartIcon, CoinIcon, DocIcon, DownloadIcon, LeafIcon, MailIcon, PinIcon, TruckIcon, WrenchIcon } from "@/components/Icons";
+import { formatDate, formatMoney, formatMoneyCompact, formatNumber, formatPercent, formatPrice, formatMonth, titleCase } from "@/lib/utils";
+import type { ElectricitySource } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+const ELEC_LABEL: Record<ElectricitySource, string> = { grid: "Grid electricity", grid_green: "Grid — green tariff", solar_hybrid: "Solar + grid hybrid" };
 
-const WEATHER_LABEL: Record<string, string> = { clear: "Clear", clouds: "Cloudy", rain: "Rain", snow: "Snow", storm: "Storm" };
+export default function SiteDetailPage({ params }: { params: { id: string } }) {
+  const site = getSite(params.id);
+  if (!site) notFound();
+  const partner = getPartner(site.partnerId);
+  const chargers = getChargersBySite(site.id);
+  const incidents = getIncidents({ siteId: site.id });
+  const openIncidents = incidents.filter((i) => i.status !== "resolved");
+  const benchmark = getBenchmark(site.id);
+  const deployment = getDeploymentForSite(site.id);
+  const documents = getDocuments({ siteId: site.id });
+  const summary = getSiteSummary(site.id);
+  const activeChargers = chargers.filter((c) => c.status === "available" || c.status === "charging").length;
+  const m = site.monthly.length ? site.monthly[site.monthly.length - 1] : null;
 
-export default async function SiteDetailPage({ params }: { params: { id: string } }) {
-  const [detail, org] = await Promise.all([getSiteDetail(params.id), getOrganization()]);
-  if (!detail) notFound();
-  const { site, competitors, benchmark, utilization, demand, priceObservations, recommendations, alerts } = detail;
+  const revChart = site.monthly.map((x) => ({ month: x.month, revenueEur: x.revenueEur, sessions: x.sessions }));
+  const upChart = site.monthly.map((x) => ({ month: x.month, uptime: +(x.uptimePct * 100).toFixed(2) }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link href="/sites" className="text-xs font-medium text-brand-600 hover:underline">← All sites</Link>
-        <PageHeader
-          title={site.name}
-          subtitle={`${site.address}, ${site.city} · Operated by ${site.operatorName}`}
-          actions={<StatusBadge status={site.status} />}
-        />
+    <div>
+      <PageHeader
+        title={site.name}
+        breadcrumb={[{ label: "Sites", href: "/sites" }, { label: site.name, href: `/sites/${site.id}` }]}
+        subtitle={`${site.address} · ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}`}
+        actions={
+          <>
+            <ActionButton variant="secondary"><MailIcon className="h-4 w-4" /> Email partner</ActionButton>
+            <ActionButton variant="primary"><DownloadIcon className="h-4 w-4" /> Site report</ActionButton>
+          </>
+        }
+      />
+
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <SiteStatusBadge status={site.status} />
+        {partner && (
+          <Link href={`/partners/${partner.id}`} className="pill hover:bg-slate-50">
+            Partner: {partner.name}
+          </Link>
+        )}
+        <span className="pill"><BoltIcon className="h-4 w-4 text-slate-400" /> {site.chargerCount} chargers · {site.totalPowerKw} kW</span>
+        {(site.electricitySource === "grid_green" || site.electricitySource === "solar_hybrid") && <span className="pill !text-success"><LeafIcon className="h-4 w-4" /> {ELEC_LABEL[site.electricitySource]}</span>}
+        {openIncidents.length > 0 && <span className="pill !border-amber-200 !text-warning"><WrenchIcon className="h-4 w-4" /> {openIncidents.length} open incident{openIncidents.length === 1 ? "" : "s"}</span>}
       </div>
 
-      {/* key stats */}
-      <Card className="card-pad">
-        <div className="grid grid-cols-2 gap-5 sm:grid-cols-4 lg:grid-cols-7">
-          <Stat label="Price / kWh" value={formatPrice(site.currentPricePerKwh, site.currency)} />
-          <Stat label="Local avg" value={formatPrice(benchmark.competitorAvg, site.currency)} sub={<span className="inline-flex items-center gap-1">gap <GapPill gapPct={benchmark.gapPct} /></span>} />
-          <Stat label="Utilization" value={formatPercent(site.utilizationRate)} tone={site.utilizationRate < org.settings.lowUtilizationThreshold ? "warning" : "default"} />
-          <Stat label="Sessions / day" value={site.sessionsPerDay} />
-          <Stat label="Revenue / mo" value={formatMoney(site.revenuePerMonth, site.currency)} />
-          <Stat label="Uptime" value={formatPercent(site.uptime, 1)} />
-          <Stat label="Max power" value={`${site.maxPowerKw} kW`} />
+      {/* Hero + facts */}
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <PhotoPlaceholder color={site.photoColor} label={`${site.city}, ${site.region}`} height={260} />
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 text-xs text-muted">
-          <span className="font-medium text-ink">Chargers:</span>
-          {site.chargers.map((c) => (
-            <span key={c.id} className="badge bg-slate-100 text-slate-700">{c.count}× {c.label} · {c.powerKw} kW · {c.connectorTypes.join("/")}</span>
-          ))}
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader title="Location & competitors" subtitle={`${competitors.length} competitor stations discovered nearby`} />
-          <div className="card-pad">
-            <SiteMap sites={[site]} competitors={competitors} highlightSiteId={site.id} height={320} />
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader title="Demand signals" subtitle={demand ? `As of ${demand.asOf}` : "Not available"} />
-          <div className="card-pad space-y-3 text-sm">
-            {demand ? (
-              <>
-                <SignalRow label="Composite demand" value={`${demand.demandMultiplier >= 1 ? "+" : ""}${Math.round((demand.demandMultiplier - 1) * 100)}% vs baseline`} tone={demand.demandMultiplier >= 1.15 ? "success" : demand.demandMultiplier <= 0.85 ? "warning" : "default"} />
-                <SignalRow label="Weather" value={`${WEATHER_LABEL[demand.weather.condition]} · ${demand.weather.tempC}°C`} />
-                <SignalRow label="Holiday" value={demand.isHoliday ? (demand.holidayName ?? "Yes") : "No"} />
-                <SignalRow label="Local events" value={demand.localEvents.length ? demand.localEvents.map((e) => `${e.name} (${e.date})`).join(", ") : "None"} />
-                <SignalRow label="Traffic index" value={formatPercent(demand.trafficIndex)} />
-                <SignalRow label="Day type" value={demand.isWeekend ? "Weekend" : "Weekday"} />
-                <p className="pt-1 text-xs text-muted">Mock signals — see <span className="font-mono">lib/demand-signals.ts</span> for the live-integration seam (weather, holidays, events, traffic).</p>
-              </>
-            ) : (
-              <EmptyState title="No demand signals" />
-            )}
-          </div>
+        <Card className="card-pad">
+          <h2 className="section-title mb-3">Site details</h2>
+          <dl>
+            <KeyValue label="Address">{site.address}</KeyValue>
+            <KeyValue label="Coordinates">{site.lat.toFixed(4)}, {site.lng.toFixed(4)}</KeyValue>
+            <KeyValue label="O&M operator">{site.operatorName}</KeyValue>
+            <KeyValue label="Electricity">{ELEC_LABEL[site.electricitySource]}</KeyValue>
+            <KeyValue label="Commissioned">{site.commissionedAt ? formatDate(site.commissionedAt) : site.expectedGoLive ? `Expected ${formatMonth(site.expectedGoLive)}` : "—"}</KeyValue>
+            <KeyValue label="Chargers">{site.chargerCount} · {site.totalPowerKw} kW total</KeyValue>
+            {benchmark && <KeyValue label="Local market share">~{formatPercent(benchmark.marketSharePct)}</KeyValue>}
+          </dl>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Hourly utilization" subtitle={utilization ? `7-day average · as of ${utilization.asOf}` : "Not available"} />
-          <div className="card-pad">{utilization ? <UtilizationChart hourly={utilization.hourly} /> : <EmptyState title="No utilization data" />}</div>
-        </Card>
-        <Card>
-          <CardHeader title="Utilization by weekday" subtitle="7-day average" />
-          <div className="card-pad">{utilization ? <WeekdayBars weekday={utilization.weekday} /> : <EmptyState title="No utilization data" />}</div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader title="Competitor benchmark" subtitle="Nearby charging stations and price gap vs. this site" />
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="px-5 py-3">Station</th>
-                  <th className="px-5 py-3">Operator</th>
-                  <th className="px-5 py-3">Distance</th>
-                  <th className="px-5 py-3">Power</th>
-                  <th className="px-5 py-3">Price / kWh</th>
-                  <th className="px-5 py-3">Availability</th>
-                  <th className="px-5 py-3">Gap vs us</th>
-                  <th className="px-5 py-3">Source</th>
-                </tr>
-              </thead>
-              <tbody>
-                {competitors.map((c) => {
-                  const gapPct = c.pricePerKwh === null ? null : (site.currentPricePerKwh - c.pricePerKwh) / c.pricePerKwh;
-                  return (
-                    <tr key={c.id} className="table-row hover:bg-slate-50">
-                      <td className="px-5 py-3 font-medium text-ink">{c.name}</td>
-                      <td className="px-5 py-3 text-muted">{c.operatorName}</td>
-                      <td className="px-5 py-3 tabular-nums">{c.distanceKm} km</td>
-                      <td className="px-5 py-3 tabular-nums">{c.maxPowerKw} kW</td>
-                      <td className="px-5 py-3 tabular-nums">{formatPrice(c.pricePerKwh, c.currency)}</td>
-                      <td className="px-5 py-3 tabular-nums">{c.availability === null ? <span className="text-slate-400">n/a</span> : formatPercent(c.availability)}</td>
-                      <td className="px-5 py-3"><GapPill gapPct={gapPct} /></td>
-                      <td className="px-5 py-3 text-xs text-slate-400">{c.source} · {relativeDate(c.lastSeenAt)}</td>
-                    </tr>
-                  );
-                })}
-                {competitors.length === 0 && (
-                  <tr><td colSpan={8}><EmptyState title="No competitors discovered" hint="Connect OpenChargeMap or Google Places to populate this." /></td></tr>
-                )}
-              </tbody>
-            </table>
+      {m ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <KpiTile label="Revenue (last month)" value={formatMoneyCompact(m.revenueEur)} icon={<CoinIcon className="h-5 w-5" />} sub={`${formatPrice(m.avgPriceEurKwh)}/kWh avg`} />
+            <KpiTile label="Sessions / day" value={formatNumber(site.sessionsPerDay)} icon={<BoltIcon className="h-5 w-5" />} sub={`${formatNumber(m.sessions)} this month`} />
+            <KpiTile label="Uptime" value={formatPercent(site.uptimePct, 1)} icon={<PinIcon className="h-5 w-5" />} sub={site.uptimePct < 0.95 ? "Below 95% target" : "Healthy"} />
+            <KpiTile label="Chargers available" value={`${activeChargers}/${site.chargerCount}`} icon={<BoltIcon className="h-5 w-5" />} sub={`${chargers.filter((c) => c.status === "faulted" || c.status === "offline").length} faulted/offline`} />
           </div>
-          {priceObservations.length > 0 && (
-            <div className="border-t border-slate-100 px-5 py-3 text-xs text-muted">
-              {priceObservations.length} recent price observations on record · most recent {relativeDate(priceObservations[priceObservations.length - 1].observedAt)}
+
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <Card>
+                <CardHeader title="Revenue & sessions" subtitle="Monthly trend" icon={<ChartIcon className="h-5 w-5" />} />
+                <div className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-2">
+                  <div className="card-pad">
+                    <p className="stat-label mb-1">Revenue (€/month)</p>
+                    <AreaTrendChart data={revChart} xKey="month" yKey="revenueEur" format="moneyCompact" height={170} />
+                  </div>
+                  <div className="card-pad">
+                    <p className="stat-label mb-1">Sessions / month</p>
+                    <BarSeriesChart data={revChart} xKey="month" yKey="sessions" color="#0B1F4D" format="number" height={170} />
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <CardHeader title="Uptime" subtitle="Monthly availability, %" icon={<PinIcon className="h-5 w-5" />} />
+                <div className="card-pad pt-2">
+                  <LineTrendChart data={upChart} xKey="month" yKey="uptime" domain={[80, 100]} format="percent" height={170} />
+                </div>
+              </Card>
+
+              <Card>
+                <CardHeader title="Chargers" subtitle={`${chargers.length} units`} icon={<BoltIcon className="h-5 w-5" />} />
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="px-5 py-2.5 sm:px-6">Unit</th>
+                        <th className="px-3 py-2.5">Vendor / model</th>
+                        <th className="px-3 py-2.5">Power</th>
+                        <th className="px-3 py-2.5">Type</th>
+                        <th className="px-3 py-2.5">Commissioned</th>
+                        <th className="px-5 py-2.5 text-right sm:px-6">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chargers.map((c) => (
+                        <tr key={c.id} className="table-row">
+                          <td className="px-5 py-2.5 font-medium text-ink sm:px-6">{c.id.split("_").pop()}</td>
+                          <td className="px-3 py-2.5 text-slate-600">{c.vendor} {c.model}</td>
+                          <td className="px-3 py-2.5 tabular-nums text-slate-600">{c.powerKw} kW</td>
+                          <td className="px-3 py-2.5 text-slate-600">{c.type} · {c.connectors} conn.</td>
+                          <td className="px-3 py-2.5 text-slate-600">{formatDate(c.commissionedAt)}</td>
+                          <td className="px-5 py-2.5 text-right sm:px-6"><ChargerStatusBadge status={c.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {benchmark && (
+                <Card>
+                  <CardHeader
+                    title="Competitor benchmark"
+                    subtitle={`${benchmark.competitors.length} networks within ~5 km · est. local market share ~${formatPercent(benchmark.marketSharePct)}`}
+                    icon={<ChartIcon className="h-5 w-5" />}
+                    action={<PositionBadge position={benchmark.position} />}
+                  />
+                  <div className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-2">
+                    <div className="card-pad">
+                      <p className="stat-label mb-1">Price (€/kWh)</p>
+                      <HBarCompareChart
+                        data={[{ label: "Us", value: benchmark.ourPriceEurKwh, highlight: true }, ...benchmark.competitors.map((c) => ({ label: c.brand, value: c.priceEurKwh }))]}
+                        format="eurkwh"
+                        height={Math.max(150, (benchmark.competitors.length + 1) * 34)}
+                      />
+                    </div>
+                    <div className="card-pad">
+                      <p className="stat-label mb-1">Max power (kW)</p>
+                      <HBarCompareChart
+                        data={[{ label: "Us", value: benchmark.ourMaxPowerKw, highlight: true }, ...benchmark.competitors.map((c) => ({ label: c.brand, value: c.maxPowerKw }))]}
+                        format="kw"
+                        height={Math.max(150, (benchmark.competitors.length + 1) * 34)}
+                      />
+                    </div>
+                  </div>
+                  <div className="card-pad pt-0">
+                    <p className="stat-label mb-2">Estimated utilization vs nearby</p>
+                    <div className="space-y-2">
+                      <UtilBar label={`${partner?.name ?? "Our site"} (us)`} value={benchmark.ourUtilizationPct} highlight />
+                      {benchmark.competitors.map((c) => (
+                        <UtilBar key={c.brand} label={`${c.brand} · ${c.distanceKm} km`} value={c.estimatedUtilizationPct} />
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader title="Maintenance history" subtitle={`${incidents.length} incident${incidents.length === 1 ? "" : "s"} logged`} icon={<WrenchIcon className="h-5 w-5" />} action={<Link href="/incidents" className="text-xs font-medium text-brand-600">All incidents →</Link>} />
+                <div className="divide-y divide-slate-100">
+                  {incidents.length === 0 && <p className="px-6 py-8 text-center text-sm text-muted">No incidents on record.</p>}
+                  {incidents.map((i) => (
+                    <Link key={i.id} href={`/incidents/${i.id}`} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50 sm:px-6">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink">{i.title}</p>
+                        <p className="text-xs text-muted">{titleCase(i.category)} · opened {formatDate(i.openedAt)}{i.resolvedAt ? ` · resolved ${formatDate(i.resolvedAt)}` : i.etaAt ? ` · ETA ${formatDate(i.etaAt)}` : ""}</p>
+                      </div>
+                      <IncidentStatusBadge status={i.status} />
+                    </Link>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              {summary && <AiSummaryCard summary={summary} />}
+              {openIncidents[0] && (
+                <Card>
+                  <CardHeader title="Open incident timeline" subtitle={openIncidents[0].title} icon={<WrenchIcon className="h-5 w-5" />} />
+                  <div className="card-pad">
+                    <Timeline events={openIncidents[0].timeline} />
+                  </div>
+                </Card>
+              )}
+              {documents.length > 0 && (
+                <Card>
+                  <CardHeader title="Site documents" icon={<DocIcon className="h-5 w-5" />} />
+                  <ul className="divide-y divide-slate-100">
+                    {documents.map((d) => (
+                      <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-2.5 sm:px-6">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-ink">{d.name}</p>
+                          <p className="text-[11px] text-muted">{titleCase(d.kind)} · {formatDate(d.uploadedAt)}</p>
+                        </div>
+                        <DownloadIcon className="h-4 w-4 shrink-0 text-slate-300" />
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <Card className="card-pad">
+          <div className="flex items-start gap-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-brand-600"><TruckIcon className="h-5 w-5" /></span>
+            <div className="flex-1">
+              <h2 className="text-base font-semibold text-ink">This site isn’t live yet</h2>
+              <p className="mt-1 text-sm text-muted">It’s currently <strong>{titleCase(site.status)}</strong>{site.expectedGoLive ? `, with an expected go-live in ${formatMonth(site.expectedGoLive)}` : ""}. Performance metrics will appear here once the site is commissioned.</p>
+              {deployment && (
+                <Link href={`/deployments/${deployment.id}`} className="btn-secondary mt-3 inline-flex">
+                  View deployment timeline
+                </Link>
+              )}
+            </div>
+          </div>
+          {deployment && (
+            <div className="mt-5">
+              <div className="mb-1 flex items-center justify-between text-xs text-muted"><span>Deployment progress</span><span className="tabular-nums">{Math.round(deployment.progress * 100)}%</span></div>
+              <ProgressBar value={deployment.progress} tone={deployment.delayed ? "amber" : "blue"} />
             </div>
           )}
         </Card>
-
-        <Card>
-          <CardHeader title="Price positioning" subtitle="This site vs. priced competitors" action={<PositionBadge position={benchmark.position} />} />
-          <div className="card-pad">
-            <PriceComparisonChart
-              ourLabel={site.name}
-              ourPrice={site.currentPricePerKwh}
-              competitors={competitors.map((c) => ({ name: c.name, price: c.pricePerKwh }))}
-              currency={site.currency}
-            />
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-sm font-semibold text-ink">Recommendations for this site</h2>
-          {recommendations.length === 0 ? (
-            <Card className="card-pad"><EmptyState title="No recommendations" hint="The pricing engine has nothing to flag for this site right now." /></Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {recommendations.map((r) => (
-                <RecommendationCard key={r.id} rec={r} />
-              ))}
-            </div>
-          )}
-        </div>
-        <Card>
-          <CardHeader title="Site alerts" subtitle={`${alerts.filter((a) => !a.read).length} unread`} />
-          <div className="card-pad">
-            <AlertsPanel alerts={alerts} showSite={false} />
-          </div>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }
 
-function SignalRow({ label, value, tone }: { label: string; value: string; tone?: "default" | "success" | "warning" }) {
-  const cls = tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "text-ink";
+function UtilBar({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-muted">{label}</span>
-      <span className={"text-right font-medium " + cls}>{value}</span>
+    <div className="flex items-center gap-3">
+      <span className="w-44 shrink-0 truncate text-xs text-slate-600">{label}</span>
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+        <div className={highlight ? "h-full rounded-full bg-brand" : "h-full rounded-full bg-slate-300"} style={{ width: `${Math.min(100, value * 200)}%` }} />
+      </div>
+      <span className="w-10 shrink-0 text-right text-xs font-medium tabular-nums text-ink">{formatPercent(value, 0)}</span>
     </div>
   );
 }
