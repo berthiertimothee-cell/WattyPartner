@@ -1,0 +1,248 @@
+// VoltYield database schema.
+//
+// This is the target persistence model for the platform. The MVP ships with an
+// in-memory mock data layer (src/lib/mock-data.ts + src/lib/data.ts) so the app
+// runs with zero infrastructure; when going live, run `prisma migrate dev` and
+// re-implement the bodies of src/lib/data.ts using PrismaClient.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  admin
+  analyst
+  viewer
+}
+
+enum Currency {
+  EUR
+  USD
+  GBP
+}
+
+enum SiteStatus {
+  active
+  maintenance
+  planned
+}
+
+enum DataSource {
+  mock
+  openchargemap
+  chargeprice
+  google_places
+  roaming_api
+  csv_import
+  manual
+}
+
+enum RecommendationType {
+  lower_price
+  raise_price
+  happy_hour
+  hold_price
+  promo_test
+}
+
+enum RecommendationStatus {
+  open
+  accepted
+  dismissed
+  exported
+}
+
+enum Severity {
+  info
+  opportunity
+  warning
+  critical
+}
+
+enum AlertType {
+  competitor_price_change
+  site_overpriced
+  site_underpriced
+  utilization_drop
+  revenue_opportunity
+  high_demand_window
+}
+
+model Organization {
+  id              String   @id @default(cuid())
+  name            String
+  country         String
+  currency        Currency @default(EUR)
+  // Engine knobs (see OrgSettings in src/lib/types.ts).
+  targetGapAbove          Float   @default(0.05)
+  lowUtilizationThreshold Float   @default(0.35)
+  highUtilizationThreshold Float  @default(0.65)
+  minPriceStep            Float   @default(0.01)
+  autoApply               Boolean @default(false)
+  createdAt       DateTime @default(now())
+  users           User[]
+  sites           Site[]
+  reports         Report[]
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  email          String       @unique
+  name           String
+  role           Role         @default(analyst)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+}
+
+model Site {
+  id                 String       @id @default(cuid())
+  organization       Organization @relation(fields: [organizationId], references: [id])
+  organizationId     String
+  name               String
+  address            String
+  city               String
+  country            String
+  lat                Float
+  lng                Float
+  operatorName       String
+  maxPowerKw         Int
+  currentPricePerKwh Float
+  currency           Currency     @default(EUR)
+  utilizationRate    Float        // 0..1, trailing 30d
+  sessionsPerDay     Float
+  revenuePerMonth    Float
+  uptime             Float        // 0..1
+  status             SiteStatus   @default(active)
+  createdAt          DateTime     @default(now())
+
+  chargers           Charger[]
+  competitors        Competitor[]
+  priceObservations  PriceObservation[]
+  utilizationData    UtilizationData[]
+  recommendations    Recommendation[]
+  alerts             Alert[]
+
+  @@index([organizationId])
+}
+
+model Charger {
+  id             String   @id @default(cuid())
+  site           Site     @relation(fields: [siteId], references: [id])
+  siteId         String
+  label          String
+  powerKw        Int
+  connectorTypes String[] // e.g. ["CCS","CHAdeMO"]
+  count          Int      @default(1)
+
+  @@index([siteId])
+}
+
+model Competitor {
+  id           String     @id @default(cuid())
+  site         Site       @relation(fields: [siteId], references: [id])
+  siteId       String
+  name         String
+  operatorName String
+  lat          Float
+  lng          Float
+  distanceKm   Float
+  maxPowerKw   Int
+  pricePerKwh  Float?
+  currency     Currency   @default(EUR)
+  availability Float?     // 0..1 or null
+  source       DataSource @default(mock)
+  lastSeenAt   DateTime   @default(now())
+
+  priceObservations PriceObservation[]
+
+  @@index([siteId])
+}
+
+model PriceObservation {
+  id           String      @id @default(cuid())
+  site         Site        @relation(fields: [siteId], references: [id])
+  siteId       String
+  competitor   Competitor? @relation(fields: [competitorId], references: [id])
+  competitorId String?
+  pricePerKwh  Float
+  currency     Currency    @default(EUR)
+  observedAt   DateTime    @default(now())
+  source       DataSource  @default(mock)
+
+  @@index([siteId])
+  @@index([competitorId])
+}
+
+model UtilizationData {
+  id        String   @id @default(cuid())
+  site      Site     @relation(fields: [siteId], references: [id])
+  siteId    String
+  asOf      DateTime
+  // 24 hourly utilization values (0..1) and 24 hourly session counts.
+  hourly    Json
+  // 7 weekday averages (0..1), index 0 = Monday.
+  weekday   Float[]
+  createdAt DateTime @default(now())
+
+  @@index([siteId])
+}
+
+model Recommendation {
+  id                 String               @id @default(cuid())
+  site               Site                 @relation(fields: [siteId], references: [id])
+  siteId             String
+  type               RecommendationType
+  severity           Severity             @default(info)
+  title              String
+  rationale          String
+  action             String
+  suggestedPriceDelta Float?
+  window             String?
+  // estimatedImpact { sessionsChangePct, revenueChangePct, revenueChangePerMonth }
+  estimatedImpact    Json
+  // signals that triggered the rule (for transparency / audit)
+  signals            Json
+  status             RecommendationStatus @default(open)
+  createdAt          DateTime             @default(now())
+
+  @@index([siteId])
+  @@index([status])
+}
+
+model Alert {
+  id        String    @id @default(cuid())
+  site      Site      @relation(fields: [siteId], references: [id])
+  siteId    String
+  type      AlertType
+  severity  Severity  @default(info)
+  title     String
+  message   String
+  data      Json
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([siteId])
+  @@index([read])
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  periodStart    DateTime
+  periodLabel    String
+  generatedAt    DateTime     @default(now())
+  // ReportSummary (see src/lib/types.ts)
+  summary        Json
+
+  @@index([organizationId])
+}
