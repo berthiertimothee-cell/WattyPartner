@@ -6,6 +6,14 @@ import { BellIcon, SearchIcon } from "../Icons";
 import { Logo } from "./Logo";
 
 export function Topbar({ user, orgName, unreadAlerts }: { user: User; orgName: string; unreadAlerts: number }) {
+  const quickTabs = [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/partners", label: "Partners" },
+    { href: "/sites", label: "Sites" },
+    { href: "/incidents", label: "Incidents" },
+    { href: "/reports", label: "Reports" },
+  ];
+
   return (
     <header className="sticky top-0 z-20 flex h-20 items-center gap-4 border-b border-white/60 bg-[#fcfffcdd] px-4 backdrop-blur-xl sm:px-6 lg:px-8">
       <Link href="/dashboard" className="lg:hidden">
@@ -13,12 +21,21 @@ export function Topbar({ user, orgName, unreadAlerts }: { user: User; orgName: s
       </Link>
 
       <div className="hidden flex-1 items-center md:flex">
-        <div className="flex w-full max-w-xl items-center gap-3 rounded-2xl border border-white/80 bg-white/90 px-4 py-3 shadow-[0_8px_30px_rgba(128,147,241,0.08)] backdrop-blur">
-          <SearchIcon className="h-4 w-4 text-slate-400" />
-          <input
-            placeholder="Search sites, partners, incidents..."
-            className="w-full bg-transparent text-sm font-medium text-ink outline-none placeholder:text-slate-400"
-          />
+        <div className="flex w-full max-w-4xl items-center gap-3">
+          <div className="flex w-full max-w-xl items-center gap-3 rounded-2xl border border-white/80 bg-white/90 px-4 py-3 shadow-[0_8px_30px_rgba(128,147,241,0.08)] backdrop-blur">
+            <SearchIcon className="h-4 w-4 text-slate-400" />
+            <input
+              placeholder="Search sites, partners, incidents..."
+              className="w-full bg-transparent text-sm font-medium text-ink outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <nav className="hidden items-center gap-1.5 xl:flex">
+            {quickTabs.map((tab) => (
+              <Link key={tab.href} href={tab.href} className="rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-white hover:text-ink">
+                {tab.label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
 
