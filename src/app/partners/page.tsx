@@ -13,7 +13,7 @@ export default function PartnersPage() {
         title="Partners"
         subtitle="Retailers, hotels, real-estate groups, fleets and municipalities operating charging sites with Watty."
         actions={
-          <ActionButton variant="primary">
+          <ActionButton href="/partners" variant="primary">
             <PlusIcon className="h-4 w-4" /> Add partner
           </ActionButton>
         }

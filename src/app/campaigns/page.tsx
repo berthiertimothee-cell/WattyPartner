@@ -27,7 +27,7 @@ export default function CampaignsPage() {
       <PageHeader
         title="Marketing campaigns"
         subtitle="Launch promo codes, charging discounts, onboarding, reopening, retailer and fleet campaigns — and track sessions generated, promo usage and estimated uplift."
-        actions={<ActionButton variant="primary"><PlusIcon className="h-4 w-4" /> New campaign</ActionButton>}
+        actions={<ActionButton href="/campaigns" variant="primary"><PlusIcon className="h-4 w-4" /> New campaign</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

@@ -16,7 +16,7 @@ export default function DeploymentsPage() {
       <PageHeader
         title="Deployments"
         subtitle="Track every site build — permits, grid connection, civil works, equipment delivery, commissioning and go-live."
-        actions={<ActionButton variant="primary"><PlusIcon className="h-4 w-4" /> New deployment</ActionButton>}
+        actions={<ActionButton href="/deployments" variant="primary"><PlusIcon className="h-4 w-4" /> New deployment</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

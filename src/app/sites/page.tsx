@@ -21,7 +21,7 @@ export default function SitesPage() {
         title="Sites"
         subtitle="Every charging location across the network — performance, status, power and competitor positioning."
         actions={
-          <ActionButton variant="primary">
+          <ActionButton href="/sites" variant="primary">
             <PlusIcon className="h-4 w-4" /> Add site
           </ActionButton>
         }

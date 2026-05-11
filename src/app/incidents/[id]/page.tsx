@@ -26,8 +26,8 @@ export default function IncidentDetailPage({ params }: { params: { id: string } 
         subtitle={site ? `${site.name} · ${site.city}` : undefined}
         actions={
           <>
-            <ActionButton variant="secondary"><MailIcon className="h-4 w-4" /> Update partner</ActionButton>
-            <ActionButton variant="primary">Change status</ActionButton>
+            <ActionButton href="/partners" variant="secondary"><MailIcon className="h-4 w-4" /> Update partner</ActionButton>
+            <ActionButton href="/incidents" variant="primary">Change status</ActionButton>
           </>
         }
       />

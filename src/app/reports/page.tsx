@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getDocuments, getPartner, getPartnerMetrics, getPartners, getRevenueReports, getReportSummary } from "@/lib/data";
-import { PageHeader, Card, CardHeader, KpiTile, ActionButton } from "@/components/ui";
+import { PageHeader, Card, CardHeader, KpiTile, ActionButton, LinkButton } from "@/components/ui";
 import { AiSummaryCard } from "@/components/AiSummaryCard";
 import { ReportStatusBadge } from "@/components/StatusBadge";
 import { ChartIcon, DownloadIcon, MailIcon } from "@/components/Icons";
@@ -22,7 +22,7 @@ export default function ReportsPage() {
       <PageHeader
         title="Reports"
         subtitle="Generate monthly partner reports — performance, uptime, incidents, revenue and royalties — and share or download them as PDF."
-        actions={<ActionButton variant="primary"><ChartIcon className="h-4 w-4" /> Generate {latestMonth ? formatMonth(latestMonth) : "monthly"} reports</ActionButton>}
+        actions={<ActionButton href="/reports" variant="primary"><ChartIcon className="h-4 w-4" /> Generate {latestMonth ? formatMonth(latestMonth) : "monthly"} reports</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -63,7 +63,9 @@ export default function ReportsPage() {
                         <td className="px-5 py-3 text-right sm:px-6">
                           <span className="inline-flex items-center gap-2">
                             {r && <ReportStatusBadge status={r.status} />}
-                            <span className="btn-ghost cursor-default !px-2 !py-1 text-brand-600" title={hasDoc ? "Download report" : "Generate report"}><DownloadIcon className="h-4 w-4" /></span>
+                            <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="ghost" className="!px-2 !py-1 text-brand-600" title={hasDoc ? "Download report" : "Generate report"}>
+                              <DownloadIcon className="h-4 w-4" />
+                            </LinkButton>
                           </span>
                         </td>
                       </tr>
@@ -83,7 +85,9 @@ export default function ReportsPage() {
                     <p className="truncate text-sm font-medium text-ink">{d.name}</p>
                     <p className="text-[11px] text-muted">{Math.round(d.sizeKb)} KB · generated {formatDate(d.uploadedAt)} by {d.uploadedBy}</p>
                   </div>
-                  <span className="btn-secondary cursor-default !py-1.5"><DownloadIcon className="h-4 w-4" /> PDF</span>
+                  <LinkButton href="/reports/monthly-partner-report-sample.pdf" className="!py-1.5" variant="secondary">
+                    <DownloadIcon className="h-4 w-4" /> PDF
+                  </LinkButton>
                 </li>
               ))}
               {reportDocs.length === 0 && <li className="px-6 py-6 text-center text-sm text-muted">No reports generated yet.</li>}
@@ -103,8 +107,10 @@ export default function ReportsPage() {
               </div>
               <AiSummaryCard summary={previewSummary} />
               <div className="flex gap-2">
-                <span className="btn-secondary flex-1 cursor-default justify-center"><MailIcon className="h-4 w-4" /> Send to partner</span>
-                <span className="btn-primary flex-1 cursor-default justify-center"><DownloadIcon className="h-4 w-4" /> Download PDF</span>
+                <ActionButton href="/partners" className="flex-1 justify-center"><MailIcon className="h-4 w-4" /> Send to partner</ActionButton>
+                <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="primary" className="flex-1 justify-center">
+                  <DownloadIcon className="h-4 w-4" /> Download PDF
+                </LinkButton>
               </div>
             </>
           )}
