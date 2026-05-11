@@ -85,6 +85,7 @@ export function LinkButton({ href, children, variant = "secondary", className, t
 }
 
 export function ActionButton({ children, variant = "secondary", className, title, href }: { children: React.ReactNode; variant?: "primary" | "secondary" | "ghost"; className?: string; title?: string; href?: string }) {
+export function ActionButton({ children, variant = "secondary", className, title }: { children: React.ReactNode; variant?: "primary" | "secondary" | "ghost"; className?: string; title?: string }) {
   const cls = variant === "primary" ? "btn-primary" : variant === "ghost" ? "btn-ghost" : "btn-secondary";
   if (href) {
     return (
