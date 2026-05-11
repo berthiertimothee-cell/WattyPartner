@@ -66,6 +66,9 @@ export default function ReportsPage() {
                             <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="ghost" className="!px-2 !py-1 text-brand-600" title={hasDoc ? "Download report" : "Generate report"}>
                               <DownloadIcon className="h-4 w-4" />
                             </LinkButton>
+                            <ActionButton variant="ghost" className="!px-2 !py-1 text-brand-600" title={hasDoc ? "Download report" : "Generate report"}>
+                              <DownloadIcon className="h-4 w-4" />
+                            </ActionButton>
                           </span>
                         </td>
                       </tr>
@@ -88,6 +91,7 @@ export default function ReportsPage() {
                   <LinkButton href="/reports/monthly-partner-report-sample.pdf" className="!py-1.5" variant="secondary">
                     <DownloadIcon className="h-4 w-4" /> PDF
                   </LinkButton>
+                  <ActionButton className="!py-1.5"><DownloadIcon className="h-4 w-4" /> PDF</ActionButton>
                 </li>
               ))}
               {reportDocs.length === 0 && <li className="px-6 py-6 text-center text-sm text-muted">No reports generated yet.</li>}
@@ -107,10 +111,11 @@ export default function ReportsPage() {
               </div>
               <AiSummaryCard summary={previewSummary} />
               <div className="flex gap-2">
-                <ActionButton href="/partners" className="flex-1 justify-center"><MailIcon className="h-4 w-4" /> Send to partner</ActionButton>
+                <ActionButton className="flex-1 justify-center"><MailIcon className="h-4 w-4" /> Send to partner</ActionButton>
                 <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="primary" className="flex-1 justify-center">
                   <DownloadIcon className="h-4 w-4" /> Download PDF
                 </LinkButton>
+                <ActionButton variant="primary" className="flex-1 justify-center"><DownloadIcon className="h-4 w-4" /> Download PDF</ActionButton>
               </div>
             </>
           )}
