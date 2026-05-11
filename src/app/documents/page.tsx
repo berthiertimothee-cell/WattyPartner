@@ -31,7 +31,7 @@ export default function DocumentsPage() {
       <PageHeader
         title="Documents & contracts"
         subtitle="One place for contracts, amendments, invoices, reports, permits, technical documentation and signed PDFs."
-        actions={<ActionButton variant="primary"><PlusIcon className="h-4 w-4" /> Upload document</ActionButton>}
+        actions={<ActionButton href="/documents" variant="primary"><PlusIcon className="h-4 w-4" /> Upload document</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

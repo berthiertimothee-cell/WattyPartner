@@ -22,7 +22,7 @@ export default function IncidentsPage() {
       <PageHeader
         title="Incidents & maintenance"
         subtitle="Centralized ticketing — incident creation, contractor assignment, SLA tracking, ETAs and repair history."
-        actions={<ActionButton variant="primary"><PlusIcon className="h-4 w-4" /> Report incident</ActionButton>}
+        actions={<ActionButton href="/incidents" variant="primary"><PlusIcon className="h-4 w-4" /> Report incident</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

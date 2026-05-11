@@ -22,7 +22,7 @@ export default function ReportsPage() {
       <PageHeader
         title="Reports"
         subtitle="Generate monthly partner reports — performance, uptime, incidents, revenue and royalties — and share or download them as PDF."
-        actions={<ActionButton variant="primary"><ChartIcon className="h-4 w-4" /> Generate {latestMonth ? formatMonth(latestMonth) : "monthly"} reports</ActionButton>}
+        actions={<ActionButton href="/reports" variant="primary"><ChartIcon className="h-4 w-4" /> Generate {latestMonth ? formatMonth(latestMonth) : "monthly"} reports</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

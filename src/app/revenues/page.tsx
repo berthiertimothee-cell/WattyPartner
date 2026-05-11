@@ -25,7 +25,7 @@ export default function RevenuesPage() {
       <PageHeader
         title="Revenue & royalties"
         subtitle="Transparent monthly accounting — gross revenue, electricity costs, platform fee, the partner's revenue share, invoices and payouts."
-        actions={<ActionButton variant="primary"><DownloadIcon className="h-4 w-4" /> Export {latestMonth ? formatMonth(latestMonth) : "month"}</ActionButton>}
+        actions={<ActionButton href="/reports" variant="primary"><DownloadIcon className="h-4 w-4" /> Export {latestMonth ? formatMonth(latestMonth) : "month"}</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

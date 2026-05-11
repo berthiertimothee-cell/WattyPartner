@@ -18,7 +18,7 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Organization" subtitle="Your CPO workspace" icon={<CogIcon className="h-5 w-5" />} action={<ActionButton>Edit</ActionButton>} />
+            <CardHeader title="Organization" subtitle="Your CPO workspace" icon={<CogIcon className="h-5 w-5" />} action={<ActionButton href="/settings">Edit</ActionButton>} />
             <div className="card-pad">
               <dl>
                 <KeyValue label="Workspace name">{org.name}</KeyValue>
@@ -32,7 +32,7 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Team" subtitle="Operator users with access to this workspace" icon={<UsersIcon className="h-5 w-5" />} action={<ActionButton>Invite</ActionButton>} />
+            <CardHeader title="Team" subtitle="Operator users with access to this workspace" icon={<UsersIcon className="h-5 w-5" />} action={<ActionButton href="/settings">Invite</ActionButton>} />
             <div className="divide-y divide-slate-100">
               {db.users.map((u) => (
                 <div key={u.id} className="flex items-center gap-3 px-5 py-3.5 sm:px-6">
@@ -48,7 +48,7 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Maintenance providers" subtitle="Contractors used for incident dispatch" icon={<WrenchIcon className="h-5 w-5" />} action={<ActionButton>Add provider</ActionButton>} />
+            <CardHeader title="Maintenance providers" subtitle="Contractors used for incident dispatch" icon={<WrenchIcon className="h-5 w-5" />} action={<ActionButton href="/settings">Add provider</ActionButton>} />
             <div className="divide-y divide-slate-100">
               {providers.map((p) => (
                 <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6">
