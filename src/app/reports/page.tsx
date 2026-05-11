@@ -111,6 +111,10 @@ export default function ReportsPage() {
               </div>
               <AiSummaryCard summary={previewSummary} />
               <div className="flex gap-2">
+                <ActionButton href="/partners" className="flex-1 justify-center"><MailIcon className="h-4 w-4" /> Send to partner</ActionButton>
+                <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="primary" className="flex-1 justify-center">
+                  <DownloadIcon className="h-4 w-4" /> Download PDF
+                </LinkButton>
                 <ActionButton className="flex-1 justify-center"><MailIcon className="h-4 w-4" /> Send to partner</ActionButton>
                 <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="primary" className="flex-1 justify-center">
                   <DownloadIcon className="h-4 w-4" /> Download PDF
