@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getContracts, getDocuments, getPartner, getPartners, getSite } from "@/lib/data";
-import { PageHeader, Card, CardHeader, KpiTile, ActionButton } from "@/components/ui";
+import { PageHeader, Card, CardHeader, KpiTile, ActionButton, LinkButton } from "@/components/ui";
 import { ContractStatusBadge } from "@/components/StatusBadge";
 import { DocIcon, DownloadIcon, PlusIcon } from "@/components/Icons";
 import { formatDate, titleCase } from "@/lib/utils";
@@ -31,7 +31,7 @@ export default function DocumentsPage() {
       <PageHeader
         title="Documents & contracts"
         subtitle="One place for contracts, amendments, invoices, reports, permits, technical documentation and signed PDFs."
-        actions={<ActionButton variant="primary"><PlusIcon className="h-4 w-4" /> Upload document</ActionButton>}
+        actions={<ActionButton href="/documents" variant="primary"><PlusIcon className="h-4 w-4" /> Upload document</ActionButton>}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -63,7 +63,9 @@ export default function DocumentsPage() {
                             {" · "}{Math.round(d.sizeKb)} KB · uploaded {formatDate(d.uploadedAt)} by {d.uploadedBy}
                           </p>
                         </div>
-                        <DownloadIcon className="h-4 w-4 shrink-0 text-slate-300" />
+                        <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="ghost" className="!px-2 !py-1 text-brand-600">
+                          <DownloadIcon className="h-4 w-4" />
+                        </LinkButton>
                       </li>
                     );
                   })}
@@ -74,6 +76,20 @@ export default function DocumentsPage() {
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader title="PDF upload examples" subtitle="Demo files ready to click and download" icon={<PlusIcon className="h-5 w-5" />} />
+            <div className="space-y-2 p-5 sm:p-6">
+              <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2">
+                <span className="text-sm text-ink">monthly-partner-report-sample.pdf</span>
+                <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="secondary"><DownloadIcon className="h-4 w-4" /> Download</LinkButton>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2">
+                <span className="text-sm text-ink">incident-update-sample.pdf</span>
+                <LinkButton href="/reports/incident-update-sample.pdf" variant="secondary"><DownloadIcon className="h-4 w-4" /> Download</LinkButton>
+              </div>
+            </div>
+          </Card>
+
           <Card>
             <CardHeader title="Contracts" subtitle="Frameworks, site-specific agreements and amendments" icon={<DocIcon className="h-5 w-5" />} />
             <div className="divide-y divide-slate-100">

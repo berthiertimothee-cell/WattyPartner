@@ -30,8 +30,8 @@ export default function DeploymentDetailPage({ params }: { params: { id: string 
         subtitle={`${dep.city}, ${dep.region} · ${dep.plannedChargers} chargers · ${dep.plannedPowerKw} kW`}
         actions={
           <>
-            <ActionButton variant="secondary"><MailIcon className="h-4 w-4" /> Update partner</ActionButton>
-            <ActionButton variant="primary">Edit timeline</ActionButton>
+            <ActionButton href="/partners" variant="secondary"><MailIcon className="h-4 w-4" /> Update partner</ActionButton>
+            <ActionButton href="/deployments" variant="primary">Edit timeline</ActionButton>
           </>
         }
       />

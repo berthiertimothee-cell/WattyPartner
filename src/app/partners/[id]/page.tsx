@@ -47,10 +47,10 @@ export default function PartnerDetailPage({ params }: { params: { id: string } }
         subtitle={`${titleCase(partner.type)} · ${partner.city}, ${partner.region} · partner since ${formatDate(partner.since)}`}
         actions={
           <>
-            <ActionButton variant="secondary">
+            <ActionButton href="/partners" variant="secondary">
               <MailIcon className="h-4 w-4" /> Draft email
             </ActionButton>
-            <ActionButton variant="primary">
+            <ActionButton href="/reports" variant="primary">
               <DownloadIcon className="h-4 w-4" /> Generate report
             </ActionButton>
           </>

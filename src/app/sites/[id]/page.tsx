@@ -46,8 +46,8 @@ export default function SiteDetailPage({ params }: { params: { id: string } }) {
         subtitle={`${site.address} · ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}`}
         actions={
           <>
-            <ActionButton variant="secondary"><MailIcon className="h-4 w-4" /> Email partner</ActionButton>
-            <ActionButton variant="primary"><DownloadIcon className="h-4 w-4" /> Site report</ActionButton>
+            <ActionButton href="/partners" variant="secondary"><MailIcon className="h-4 w-4" /> Email partner</ActionButton>
+            <ActionButton href="/reports/monthly-partner-report-sample.pdf" variant="primary"><DownloadIcon className="h-4 w-4" /> Site report</ActionButton>
           </>
         }
       />
