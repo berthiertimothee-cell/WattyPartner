@@ -84,13 +84,12 @@ export function LinkButton({ href, children, variant = "secondary", className }:
   );
 }
 
-/** Visual-only button (the demo has no mutating backend). */
 export function ActionButton({ children, variant = "secondary", className, title }: { children: React.ReactNode; variant?: "primary" | "secondary" | "ghost"; className?: string; title?: string }) {
   const cls = variant === "primary" ? "btn-primary" : variant === "ghost" ? "btn-ghost" : "btn-secondary";
   return (
-    <span className={cn(cls, "cursor-default select-none", className)} title={title}>
+    <button type="button" className={cn(cls, className)} title={title}>
       {children}
-    </span>
+    </button>
   );
 }
 
