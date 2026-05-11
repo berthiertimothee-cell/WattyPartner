@@ -52,6 +52,7 @@ export default function ReportsPage() {
                   {partners.map((p) => {
                     const pm = getPartnerMetrics(p.id);
                     const r = allReports.find((x) => x.partnerId === p.id && x.month === latestMonth) ?? getRevenueReports({ partnerId: p.id })[0];
+                    const hasDoc = reportDocs.some((d) => d.partnerId === p.id);
                     return (
                       <tr key={p.id} className="table-row">
                         <td className="px-5 py-3 sm:px-6"><Link href={`/partners/${p.id}`} className="font-medium text-ink hover:text-brand-600">{p.name}</Link></td>
@@ -62,7 +63,7 @@ export default function ReportsPage() {
                         <td className="px-5 py-3 text-right sm:px-6">
                           <span className="inline-flex items-center gap-2">
                             {r && <ReportStatusBadge status={r.status} />}
-                            <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="ghost" className="!px-2 !py-1 text-brand-600" >
+                            <LinkButton href="/reports/monthly-partner-report-sample.pdf" variant="ghost" className="!px-2 !py-1 text-brand-600" title={hasDoc ? "Download report" : "Generate report"}>
                               <DownloadIcon className="h-4 w-4" />
                             </LinkButton>
                           </span>

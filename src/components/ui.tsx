@@ -75,10 +75,10 @@ export function EmptyState({ title, hint, icon }: { title: string; hint?: string
 // Buttons & links
 // ---------------------------------------------------------------------------
 
-export function LinkButton({ href, children, variant = "secondary", className }: { href: string; children: React.ReactNode; variant?: "primary" | "secondary" | "ghost"; className?: string }) {
+export function LinkButton({ href, children, variant = "secondary", className, title }: { href: string; children: React.ReactNode; variant?: "primary" | "secondary" | "ghost"; className?: string; title?: string }) {
   const cls = variant === "primary" ? "btn-primary" : variant === "ghost" ? "btn-ghost" : "btn-secondary";
   return (
-    <Link href={href} className={cn(cls, className)}>
+    <Link href={href} className={cn(cls, className)} title={title}>
       {children}
     </Link>
   );
