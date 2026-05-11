@@ -22,6 +22,7 @@ import type {
   DocumentItem,
   Incident,
   IncidentStatus,
+  IntegrationConfig,
   MaintenanceProvider,
   Notification,
   Partner,
@@ -101,6 +102,12 @@ export function getMaintenanceProviders(): MaintenanceProvider[] {
 }
 export function getMaintenanceProvider(id?: string): MaintenanceProvider | undefined {
   return id ? db.maintenanceProviders.find((m) => m.id === id) : undefined;
+}
+
+// --- integrations ---------------------------------------------------------
+
+export function getIntegrations(): IntegrationConfig[] {
+  return [...db.integrations].sort((a, b) => a.label.localeCompare(b.label));
 }
 /** Hours past (positive) or remaining until (negative) the SLA deadline. */
 export function slaHoursOver(i: Incident): number {

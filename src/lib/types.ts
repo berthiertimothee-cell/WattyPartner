@@ -27,6 +27,21 @@ export interface Organization {
   contactEmail: string;
 }
 
+export type IntegrationKey = "hubspot" | "metabase" | "site_tracker";
+
+export type IntegrationStatus = "not_configured" | "ready" | "connected" | "error";
+
+export interface IntegrationConfig {
+  id: IntegrationKey;
+  label: string;
+  status: IntegrationStatus;
+  mode: "api" | "oauth" | "webhook";
+  description: string;
+  lastSyncAt?: string;
+  owner: string;
+  nextStep: string;
+}
+
 export type PartnerType =
   | "retail"
   | "hospitality"

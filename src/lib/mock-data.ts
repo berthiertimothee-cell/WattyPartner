@@ -14,6 +14,7 @@ import type {
   Deployment,
   DocumentItem,
   Incident,
+  IntegrationConfig,
   MaintenanceProvider,
   MonthlyMetric,
   Notification,
@@ -141,6 +142,36 @@ export const users: User[] = [
 ];
 
 export const CURRENT_USER_ID = "usr_camille";
+
+export const integrations: IntegrationConfig[] = [
+  {
+    id: "hubspot",
+    label: "HubSpot CRM",
+    status: "ready",
+    mode: "oauth",
+    description: "Synchronize partner accounts, contacts and lifecycle notes from PartnerOS to HubSpot.",
+    owner: "Partner Success Ops",
+    nextStep: "Créer une app privée HubSpot et mapper partnerId -> companyId.",
+  },
+  {
+    id: "metabase",
+    label: "Metabase BI",
+    status: "ready",
+    mode: "api",
+    description: "Publish curated datasets (revenues, uptime, incidents) and embedded dashboards for teams.",
+    owner: "Data Team",
+    nextStep: "Provisionner un service account lecture seule et définir les collections Watty.",
+  },
+  {
+    id: "site_tracker",
+    label: "Site Tracker",
+    status: "not_configured",
+    mode: "webhook",
+    description: "Ingest site timeline changes (permits, grid milestones, commissioning) into deployments.",
+    owner: "Deployment PMO",
+    nextStep: "Valider le schéma webhook (siteRef, stage, plannedAt, completedAt) avec l'outil terrain.",
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Partners

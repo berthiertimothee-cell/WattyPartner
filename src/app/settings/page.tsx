@@ -1,4 +1,4 @@
-import { getCurrentUser, getDashboardMetrics, getMaintenanceProviders, getOrganization } from "@/lib/data";
+import { getCurrentUser, getDashboardMetrics, getIntegrations, getMaintenanceProviders, getOrganization } from "@/lib/data";
 import { PageHeader, Card, CardHeader, KeyValue, Avatar, ActionButton, Badge } from "@/components/ui";
 import { BoltIcon, CogIcon, SparkleIcon, UsersIcon, WrenchIcon } from "@/components/Icons";
 import * as db from "@/lib/mock-data";
@@ -8,6 +8,7 @@ export default function SettingsPage() {
   const org = getOrganization();
   const user = getCurrentUser();
   const providers = getMaintenanceProviders();
+  const integrations = getIntegrations();
   const m = getDashboardMetrics();
 
   return (
@@ -99,19 +100,19 @@ export default function SettingsPage() {
               <h2 className="section-title">Integrations</h2>
             </div>
             <ul className="space-y-2 text-sm">
-              {[
-                ["OCPP / CSMS", "Connected", "green"],
-                ["Accounting (export)", "CSV / API", "neutral"],
-                ["Mapbox", "Configured", "green"],
-                ["Email (partner comms)", "Connected", "green"],
-                ["Claude API", "Bring your key", "amber"],
-              ].map(([name, status, tone]) => (
-                <li key={name as string} className="flex items-center justify-between">
-                  <span className="text-slate-700">{name}</span>
-                  <Badge tone={tone as never}>{status}</Badge>
+              {integrations.map((integration) => (
+                <li key={integration.id} className="rounded-xl border border-slate-100 p-2.5">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-slate-700">{integration.label}</span>
+                    <Badge tone={integration.status === "connected" ? "green" : integration.status === "ready" ? "blue" : integration.status === "error" ? "red" : "amber"}>
+                      {integration.status.replace("_", " ")}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted">{integration.description}</p>
                 </li>
               ))}
             </ul>
+            <p className="mt-3 text-[11px] text-muted">Priorité Q2: HubSpot, Metabase et Site Tracker (timeline terrains) pour unifier CRM, BI et suivi déploiement.</p>
           </Card>
         </div>
       </div>
